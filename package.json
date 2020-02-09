@@ -1,0 +1,29 @@
+{
+	"name": "thelightingcontroller",
+	"version": "1.0.0",
+	"api_version": "1.0.0",
+	"description": "The Lighting Controller (aka Showtec QuickDMX, Chauvet ShowXpress, Sweetlight Controller)",
+	"keywords": [
+		"Lighting"
+	],
+	"manufacturer": "thelightingcontroller.com, Chauvet, Showtec, Sweetlight",
+	"product": "QuickDMX, ShowXPress",
+	"shortname": "QuickDMX",
+	"homepage": "https://github.com/thargy/companion-module-thelightingcontroller#readme",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/thargy/companion-module-thelightingcontroller.git"
+	},
+	"author": "Craig Dean <thargy@yahoo.com>",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/thargy/companion-module-thelightingcontroller/issues"
+	},
+	"dependencies": {
+		"xml2js": "^0.4.17"
+	}
+}
