@@ -33,171 +33,8 @@ instance.prototype.init = function () {
 	log = self.log;
 
 	self.status(self.STATE_UNKNOWN);
-
-	self.init_presets();
 	self.init_tcp();
 };
-
-
-instance.prototype.init_presets = function () {
-	var self = this;
-	var presets = [];
-	var myname = self.label;
-
-	for (var pb = 1; pb <= this.numPlaybacks; pb++) {
-		presets.push({
-			category: 'Playbacks',
-			label: 'Go button for playback ' + pb,
-			bank: {
-				style: 'text',
-				text: 'GO ' + pb,
-				size: 'auto',
-				color: 0,
-				bgcolor: self.rgb(255, 0, 0)
-			},
-			actions: [
-				{
-					action: 'playback_go',
-					options: {
-						playback: pb
-					}
-				}
-			]
-		}, {
-			category: 'Playbacks with Cuestatus',
-			label: 'Go button for playback ' + pb,
-			bank: {
-				style: 'text',
-				text: 'GO ' + pb + '\\n$(' + myname + ':playback' + pb + '_cuestack) : $(' + myname + ':playback' + pb + '_cue)',
-				size: 'auto',
-				color: 0,
-				bgcolor: self.rgb(255, 0, 0)
-			},
-			actions: [
-				{
-					action: 'playback_go',
-					options: {
-						playback: pb
-					}
-				}
-			],
-			feedbacks: [
-				{
-					type: 'playback_empty',
-					options: {
-						playback: pb,
-						goodbg: self.rgb(255, 0, 0),
-						goodfg: self.rgb(0, 0, 0),
-						badbg: self.rgb(127, 0, 0),
-						badfg: self.rgb(0, 0, 0)
-					}
-				}
-			]
-		});
-
-		for (var la = 1; la <= this.numLayers; la++) {
-			presets.push({
-				category: 'Sources',
-				label: 'Play button for source ' + la,
-				bank: {
-					style: 'text',
-					text: '⏵ ' + la + '\\n$(' + myname + ':source' + la + '_elapsed)',
-					size: '18',
-					color: 0,
-					bgcolor: self.rgb(255, 0, 0)
-				},
-				actions: [
-					{
-						action: 'layer_playback',
-						options: {
-							layer: la,
-							playstate: 0
-						}
-					}
-				],
-				feedbacks: [
-					{
-						type: 'source_playstate',
-						options: {
-							source: la,
-							playstate: '0',
-							goodbg: self.rgb(255, 0, 0),
-							goodfg: self.rgb(0, 0, 0),
-							badbg: self.rgb(127, 0, 0),
-							badfg: self.rgb(0, 0, 0)
-						}
-					}
-				]
-			}, {
-				category: 'Sources',
-				label: 'Pause button for source ' + la,
-				bank: {
-					style: 'text',
-					text: '⏸ ' + la,
-					size: '18',
-					color: 0,
-					bgcolor: self.rgb(255, 0, 0)
-				},
-				actions: [
-					{
-						action: 'layer_playback',
-						options: {
-							layer: la,
-							playstate: 5
-						}
-					}
-				],
-				feedbacks: [
-					{
-						type: 'source_playstate',
-						options: {
-							source: la,
-							playstate: '5',
-							goodbg: self.rgb(255, 0, 0),
-							goodfg: self.rgb(0, 0, 0),
-							badbg: self.rgb(127, 0, 0),
-							badfg: self.rgb(0, 0, 0)
-						}
-					}
-				]
-			}, {
-				category: 'Sources',
-				label: 'Stop button for source ' + la,
-				bank: {
-					style: 'text',
-					text: '⏹ ' + la + '\\n$(' + myname + ':source' + la + '_countdown)',
-					size: '18',
-					color: 0,
-					bgcolor: self.rgb(255, 0, 0)
-				},
-				actions: [
-					{
-						action: 'layer_playback',
-						options: {
-							layer: la,
-							playstate: 6
-						}
-					}
-				],
-				feedbacks: [
-					{
-						type: 'source_playstate',
-						options: {
-							source: la,
-							playstate: '6',
-							goodbg: self.rgb(255, 0, 0),
-							goodfg: self.rgb(0, 0, 0),
-							badbg: self.rgb(127, 0, 0),
-							badfg: self.rgb(0, 0, 0)
-						}
-					}
-				]
-			});
-		}
-	}
-	this.setPresetDefinitions(presets);
-};
-
 
 instance.prototype.config_fields = function () {
 	var self = this;
@@ -276,10 +113,10 @@ instance.prototype.action = function (action) {
 			}
 			break;
 		case 'autobpm':
-			cmd = `AUTO_BPM_${(opt.state=='true' ? 'ON' : 'OFF')}`;
+			cmd = `AUTO_BPM_${(opt.state == 'true' ? 'ON' : 'OFF')}`;
 			break;
 		case 'freeze':
-			cmd = `FREEZE_${(opt.state=='true' ? 'ON' : 'OFF')}`;
+			cmd = `FREEZE_${(opt.state == 'true' ? 'ON' : 'OFF')}`;
 			break;
 
 		/*
@@ -319,6 +156,9 @@ instance.prototype.action = function (action) {
 						break;
 				}
 				cmd = `BUTTON_${(press ? 'PRESS' : 'RELEASE')}${SEPARATOR}${button.name}`;
+
+				// Although we should get an acknowledgment anyway, update pre-emptively.
+				self.setButton(button, press);
 			} else {
 				log('error', `Cannot perform ${action.action} action for unknown button ${(action.action.includes('Position') ? 'position' : 'index')} '${opt.name}'.`);
 			}
@@ -335,6 +175,9 @@ instance.prototype.action = function (action) {
 					log('error', `Cannot perform ${action.action} action for fader ${opt.name}, as value '${value}' is invalid.`);
 				} else {
 					cmd = `FADER_CHANGE${SEPARATOR}${fader.index}${SEPARATOR}${value}`;
+
+					// We don't get a confirmation from live, so we have to assume it worked here.
+					self.setFader(fader, value);
 				}
 			} else {
 				log('error', `Cannot perform ${action.action} action for unknown fader '${opt.name}'.`);
@@ -370,6 +213,9 @@ instance.prototype.action = function (action) {
 		/*
 		 * Custom commands
 		 */
+		case 'refresh':
+			cmd = 'BUTTON_LIST';
+			break;
 		case 'sendcustomcommand':
 			cmd = opt.command;
 			break;
@@ -394,8 +240,11 @@ instance.prototype.feedback = function (feedback, bank) {
 	var opt = feedback.options;
 
 	switch (feedback.type) {
-		case 'syncColor':
-		case 'syncColorPosition':
+		/*
+		 * Buttons
+		 */
+		case 'buttonColor':
+		case 'buttonColorPosition':
 			var button = self.getButton(opt.name);
 			if (!button) {
 				return {
@@ -421,6 +270,74 @@ instance.prototype.feedback = function (feedback, bank) {
 					bgcolor: button.color
 				};
 			}
+
+		/*
+		 * Faders
+		 */
+		case 'faderColor':
+		case 'faderFadeColor':
+			var fader = self.getFader(opt.name);
+			if (!fader) {
+				return {
+					color: opt.disabledfg,
+					bgcolor: opt.disabledbg
+				};
+			} else if (feedback.type == 'faderColor') {
+				var delta = Math.abs(fader.value - opt.value);
+				if (!isNaN(delta) && delta <= opt.tolerance) {
+					return {
+						color: opt.matchedfg,
+						bgcolor: opt.matchedbg
+					};
+				}
+			} else {
+				var start = {
+					value: opt.startValue,
+					style: {
+						color: opt.startfg,
+						bgcolor: opt.startbg
+					}
+				};
+				var end = {
+					value: opt.endValue,
+					style: {
+						color: opt.endfg,
+						bgcolor: opt.endbg
+					}
+				};
+				var value = fader.value;
+
+				// Swap start and end so start value always <= end value.
+				if (start.value > end.value) {
+					var t = start;
+					start = end;
+					end = t;
+				}
+
+				// Deal with out of range values.
+				if (value <= start.value) {
+					// Note as both checks are <=, then if start.value==end.value
+					// the start colors will be chosen only when the value exactly
+					// matches the start value, and the end colors will never match!
+					return start.style;
+				} else if (value >= end.value) {
+					return end.style;
+				}
+
+				// Calculate percentage (0->1)
+				// NOTE: Div by zero should never happen due to above checks
+				var pc = (value - start.value) / (end.value - start.value);
+
+				// Lerp
+				var ss = start.style;
+				var es = end.style;
+				return {
+					color: self.lerp(ss.color, es.color, pc),
+					bgcolor: self.lerp(ss.bgcolor, es.bgcolor, pc)
+				};
+			}
+			break;
+
 		default:
 			log('error', `Unknown feedback type - ${feedback.type}`);
 			break;
@@ -520,29 +437,12 @@ instance.prototype.receiveLine = function (line) {
 			});
 			break;
 		case 'BUTTON_PRESS':
-			var button = self.getButton(NAMEPREFIX + data);
-			if (button) {
-				log('info', `Button ${data} was pressed.`);
-				button.pressed = true;
-				self.setVariable(`button${button.index}Pressed`, button.pressed);
-
-				// Check feedbacks
-				self.checkFeedbacks('syncColor');
-				self.checkFeedbacks('syncColorPosition');
-			} else {
-				log('error', `Button ${data} is unknown.`);
-			}
-			break;
 		case 'BUTTON_RELEASE':
 			var button = self.getButton(NAMEPREFIX + data);
+			var pressed = cmd == 'BUTTON_PRESS';
 			if (button) {
-				log('info', `Button ${data} was released.`);
-				button.pressed = false;
-				self.setVariable(`button${button.index}Pressed`, button.pressed);
-
-				// Check feedbacks
-				self.checkFeedbacks('syncColor');
-				self.checkFeedbacks('syncColorPosition');
+				log('info', `Button ${data} was ${(pressed ? 'pressed' : 'released')}`);
+				self.setButton(button, pressed);
 			} else {
 				log('error', `Button ${data} is unknown.`);
 			}
@@ -552,10 +452,8 @@ instance.prototype.receiveLine = function (line) {
 			var value = Number(line.split(SEPARATOR)[2]);
 			var fader = self.getFader(index);
 			if (fader) {
-				log('info', `Fader ${fader.name} was changed to ${value}.`);
-				fader.value = value;
-				self.setVariable(`fader${fader.index}Name`, fader.name);
-				self.setVariable(`fader${fader.index}Value`, fader.value);
+				log('debug', `Fader ${fader.name} was changed to ${value}.`);
+				self.setFader(fader, value);
 			} else {
 				log('error', `Fader ${index} is unknown.`);
 			}
@@ -637,7 +535,7 @@ instance.prototype.updateState = function (rawButtonList) {
 						page: p.index,
 						pageName: p.name
 					};
-					b.position = `(${b.page}:${b.column},${b.line})`;
+					b.position = `[${b.page}:${b.column},${b.line}]`;
 					p.buttons[b.name] = b;
 
 					// Add direct lookups by index and position
@@ -656,12 +554,7 @@ instance.prototype.updateState = function (rawButtonList) {
 					variables.push({ label: `Button ${b.position} is pressed`, name: `button${b.position}Pressed` });
 					variables.push({ label: `Button ${b.position} is flash`, name: `button${b.position}Flash` });
 
-					// TODO add type indicator
-					/*
-					variables.push({ label: `Button ${b.index} column number`, name: `button${b.index}Column` });
-					variables.push({ label: `Button ${b.index} line number`, name: `button${b.index}Line` });
-					variables.push({ label: `Button ${b.index} color`, name: `button${b.index}Color` });
-					*/
+					// TODO add type, e.g. Macro, Steps, etc.
 				});
 			}
 			state.pages[p.name] = p;
@@ -686,9 +579,11 @@ instance.prototype.updateState = function (rawButtonList) {
 	// Update state
 	self.state = state;
 
-	// Update variable defintions and values
+	// Update variable defintions
 	self.setVariableDefinitions(variables);
 
+	// Set variables and create presets
+	var presets = [];
 	Object.values(self.state.pages).forEach((page) => {
 		self.setVariable(`page${page.index}Name`, page.name);
 		self.setVariable(`page${page.index}Columns`, page.columns);
@@ -700,6 +595,65 @@ instance.prototype.updateState = function (rawButtonList) {
 		self.setVariable(`fader${fader.index}Name`, fader.name);
 		self.setVariable(`fader${fader.index}Value`, fader.value);
 		faderChoices.push({ id: fader.index, label: `${fader.index}: ${fader.name}` });
+
+		// Add fader presets
+		presets.push({
+			category: 'Faders',
+			label: 'Set Fader to 0 (ON), and fade background with fader value.',
+			bank: {
+				style: 'text',
+				text: `$(QuickDMX:fader${fader.index}Name)\\nON\\n$(QuickDMX:fader${fader.index}Value)`,
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0)
+			},
+			actions: [
+				{
+					action: 'fader',
+					options: {
+						name: fader.index,
+						value: 0
+					}
+				}
+			],
+			feedbacks: [
+				{
+					type: 'faderFadeColor',
+					options: {
+						name: fader.index
+					}
+				}
+			]
+		}, {
+			category: 'Faders',
+			label: 'Set Fader to -100 (OFF), and highlight when with +/- 10 of value.',
+			bank: {
+				style: 'text',
+				text: `$(QuickDMX:fader${fader.index}Name)\\OFF\\n$(QuickDMX:fader${fader.index}Value)`,
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0)
+			},
+			actions: [
+				{
+					action: 'fader',
+					options: {
+						name: fader.index,
+						value: -100
+					}
+				}
+			],
+			feedbacks: [
+				{
+					type: 'faderColor',
+					options: {
+						name: fader.index,
+						value: -100,
+						matchedbg: self.rgb(128, 0, 0)
+					}
+				}
+			]
+		});
 	});
 
 	var buttonChoices = [];
@@ -708,13 +662,14 @@ instance.prototype.updateState = function (rawButtonList) {
 		// Only look at named version of button, to prevent triplication
 		if (key.charAt(0) != NAMEPREFIX) { return; }
 		var button = self.state.buttons[key];
+		var flash = button.flash;
 
 		self.setVariable(`button${button.index}Name`, button.safeName);
 		self.setVariable(`button${button.index}Pressed`, button.pressed);
-		self.setVariable(`button${button.index}Flash`, button.flash);
+		self.setVariable(`button${button.index}Flash`, flash);
 		self.setVariable(`button${button.position}Name`, button.safeName);
 		self.setVariable(`button${button.position}Pressed`, button.pressed);
-		self.setVariable(`button${button.position}Flash`, button.flash);
+		self.setVariable(`button${button.position}Flash`, flash);
 		/*
 		self.setVariable(`button${button.index}Column`, button.column);
 		self.setVariable(`button${button.index}Line`, button.line);
@@ -722,9 +677,113 @@ instance.prototype.updateState = function (rawButtonList) {
 		*/
 		buttonChoices.push({ id: button.index, label: `${button.pageName} #${button.index}: ${button.safeName}` });
 		buttonPositionChoices.push({ id: button.position, label: `${button.pageName} ${button.position}: ${button.safeName}` });
+
+		// Add button presets
+		presets.push({
+			category: 'Buttons by index',
+			label: flash ? 'Press flash button' : 'Toggle button',
+			bank: {
+				style: 'text',
+				text: `$(QuickDMX:button${button.index}Name)`,
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0)
+			},
+			actions: [
+				{
+					action: flash ? 'press' : 'toggle',
+					options: {
+						name: button.index
+					}
+				}
+			],
+			feedbacks: [
+				{
+					type: 'buttonColor',
+					options: {
+						name: button.index
+					}
+				}
+			]
+		}, {
+			category: 'Buttons by position',
+			label: flash ? 'Press flash button' : 'Toggle button',
+			bank: {
+				style: 'text',
+				text: `$(QuickDMX:button${button.position}Name)`,
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0)
+			},
+			actions: [
+				{
+					action: flash ? 'press' : 'toggle',
+					options: {
+						name: button.position
+					}
+				}
+			],
+			feedbacks: [
+				{
+					type: 'buttonColor',
+					options: {
+						name: button.position
+					}
+				}
+			]
+		});
 	});
 
-	// Update actions	
+	presets.push({
+		category: 'Miscellaneous',
+		label: 'Refresh',
+		bank: {
+			style: 'text',
+			text: `Refresh\\nDMX`,
+			size: 'auto',
+			color: self.rgb(255, 255, 255),
+			bgcolor: self.rgb(0, 0, 0)
+		},
+		actions: [
+			{
+				action: 'refresh'
+			}
+		]
+	},{
+		category: 'Miscellaneous',
+		label: 'Tap',
+		bank: {
+			style: 'text',
+			text: `Tap\\nBPM`,
+			size: 'auto',
+			color: self.rgb(255, 255, 255),
+			bgcolor: self.rgb(0, 0, 0)
+		},
+		actions: [
+			{
+				action: 'bpmTap'
+			}
+		]
+	},{
+		category: 'Miscellaneous',
+		label: 'Beat',
+		bank: {
+			style: 'text',
+			text: `Beat`,
+			size: 'auto',
+			color: self.rgb(255, 255, 255),
+			bgcolor: self.rgb(0, 0, 0)
+		},
+		actions: [
+			{
+				action: 'beat'
+			}
+		]
+	})
+
+	/*
+	 * Update actions
+	 */
 	self.system.emit('instance_actions', self.id, {
 		/*
 		 * Tempo controls
@@ -871,7 +930,7 @@ instance.prototype.updateState = function (rawButtonList) {
 		},
 		/*
 		 * Timeline
-		 */	
+		 */
 		'timelinePlayfrom': {
 			label: 'Timeline Play From'
 		},
@@ -884,6 +943,9 @@ instance.prototype.updateState = function (rawButtonList) {
 		/*
 		 * Custom commands
 		 */
+		'refresh': {
+			label: 'Refresh interface'
+		},
 		'sendcustomcommand': {
 			label: 'Send custom command',
 			options: [{
@@ -897,12 +959,16 @@ instance.prototype.updateState = function (rawButtonList) {
 		}
 	});
 
-	// Update feedbacks
-
+	/*
+	 * Update feedbacks
+	 */
 	self.setFeedbackDefinitions({
-		syncColor: {
-			label: 'Synchronise colors, by index',
-			description: 'Will synchronise the button colours.',
+		/*
+		 * Buttons
+		 */
+		buttonColor: {
+			label: 'Synchronise button colors, by index',
+			description: 'Will synchronise the button colours using the specified button\'s index.',
 			options: [{
 				type: 'dropdown',
 				label: 'Button index',
@@ -926,20 +992,28 @@ instance.prototype.updateState = function (rawButtonList) {
 			},
 			{
 				type: 'colorpicker',
-				label: 'DisabledBackground color',
+				label: 'Disabled Background color',
 				id: 'disabledbg',
 				default: self.rgb(0, 0, 0)
 			}]
 		},
-		syncColorPosition: {
-			label: 'Synchronise colors, by position',
-			description: 'Will synchronise the button colours.',
+		buttonColorPosition: {
+			label: 'Synchronise button colors, by position',
+			description: 'Will synchronise the button colours using the specified button\'s position.',
 			options: [{
 				type: 'dropdown',
 				label: 'Name',
 				id: 'name',
 				regex: self.REGEX_SOMETHING,
 				choices: buttonPositionChoices
+			},
+			{
+				type: 'textinput',
+				label: 'Pressed alpha',
+				id: 'alpha',
+				default: '128',
+				tooltip: 'A number from 0 to 255, where 0 will set the backgound of pressed buttons to black, and 255 will not affect the background.',
+				regex: '/^(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])$/'
 			},
 			{
 				type: 'colorpicker',
@@ -949,7 +1023,124 @@ instance.prototype.updateState = function (rawButtonList) {
 			},
 			{
 				type: 'colorpicker',
-				label: 'DisabledBackground color',
+				label: 'Disabled Background color',
+				id: 'disabledbg',
+				default: self.rgb(0, 0, 0)
+			}]
+		},
+		/*
+		 * Faders
+		 */
+		faderColor: {
+			label: 'Match fader value',
+			description: 'Will set the button color when the specified fader\'s value matches a specific value.',
+			options: [{
+				type: 'dropdown',
+				label: 'Fader',
+				id: 'name',
+				regex: self.REGEX_SOMETHING,
+				choices: faderChoices
+			},
+			{
+				type: 'textinput',
+				label: 'Value (-100 -> 100) to match',
+				id: 'value',
+				default: 0,
+				tooltip: 'Value of fader to match',
+				regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+			},
+			{
+				type: 'textinput',
+				label: 'Tolerance (0 -> 100)',
+				id: 'tolerance',
+				default: 10,
+				tooltip: 'Values within +/-tolerance of the specified value will be considered as matching.',
+				regex: '/^(100|[0-9]|[0-9][0-9])$/'
+			},
+			{
+				type: 'colorpicker',
+				label: 'Matched Foreground color',
+				id: 'matchedfg',
+				default: self.rgb(255, 255, 255)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Matched Background color',
+				id: 'matchedbg',
+				default: self.rgb(0, 128, 0)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Disabled Foreground color',
+				id: 'disabledfg',
+				default: self.rgb(80, 80, 80)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Disabled Background color',
+				id: 'disabledbg',
+				default: self.rgb(0, 0, 0)
+			}]
+		},
+		faderFadeColor: {
+			label: 'Fade with fader value',
+			description: 'Will adjust the button\'s colors as the specified fader\'s value changes.',
+			options: [{
+				type: 'dropdown',
+				label: 'Fader',
+				id: 'name',
+				regex: self.REGEX_SOMETHING,
+				choices: faderChoices
+			},
+			{
+				type: 'textinput',
+				label: 'Start value (-100 -> 100)',
+				id: 'startValue',
+				default: 0,
+				tooltip: 'Start value of fade range (values outside the range will be clamped).',
+				regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+			},
+			{
+				type: 'textinput',
+				label: 'End value (-100 -> 100)',
+				id: 'endValue',
+				default: -100,
+				tooltip: 'Start value of fade range (values outside the range will be clamped).',
+				regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+			},
+			{
+				type: 'colorpicker',
+				label: 'Start Foreground color',
+				id: 'startfg',
+				default: self.rgb(255, 255, 255)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Start Background color',
+				id: 'startbg',
+				default: self.rgb(0, 200, 0)
+			},
+			{
+				type: 'colorpicker',
+				label: 'End Foreground color',
+				id: 'endfg',
+				default: self.rgb(255, 255, 255)
+			},
+			{
+				type: 'colorpicker',
+				label: 'End Background color',
+				id: 'endbg',
+				default: self.rgb(0, 0, 0)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Disabled Foreground color',
+				id: 'disabledfg',
+				default: self.rgb(80, 80, 80)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Disabled Background color',
 				id: 'disabledbg',
 				default: self.rgb(0, 0, 0)
 			}]
@@ -957,11 +1148,13 @@ instance.prototype.updateState = function (rawButtonList) {
 	});
 
 	// Update presets
-
+	self.setPresetDefinitions(presets);
 
 	// Check feedbacks
-	self.checkFeedbacks('syncColor');
-	self.checkFeedbacks('syncColorPosition');
+	self.checkFeedbacks('buttonColor');
+	self.checkFeedbacks('buttonColorPosition');
+	self.checkFeedbacks('faderColor');
+	self.checkFeedbacks('faderFadeColor');
 };
 
 instance.prototype.getButton = function (name) {
@@ -969,9 +1162,64 @@ instance.prototype.getButton = function (name) {
 	return name && self.state.buttons && self.state.buttons[name];
 };
 
+instance.prototype.setButton = function (button, pressed) {
+	if (button.pressed == pressed) {
+		return;
+	}
+	var self = this;
+	button.pressed = pressed;
+	self.setVariable(`button${button.index}Pressed`, button.pressed);
+	self.setVariable(`button${button.position}Pressed`, button.pressed);
+	self.checkFeedbacks('buttonColor');
+	self.checkFeedbacks('buttonColorPosition');
+};
+
 instance.prototype.getFader = function (index) {
 	return this.state.faders[index];
 };
+
+instance.prototype.setFader = function (fader, value) {
+	if (fader.value == value) {
+		return;
+	}
+	var self = this;
+	fader.value = value;
+	self.setVariable(`fader${fader.index}Name`, fader.name);
+	self.setVariable(`fader${fader.index}Value`, fader.value);
+	self.checkFeedbacks('faderColor');
+	self.checkFeedbacks('faderFadeColor');
+};
+
+instance.prototype.lerp = function (start, end, amount) {
+	if (start == end || amount <= 0) return start;
+	if (amount >= 1) return end;
+
+	var self = this;
+	sc = self.toColor(start);
+	ec = self.toColor(end);
+
+	return this.fromColor({
+		r: sc.r + Math.round(amount * (ec.r - sc.r)),
+		g: sc.g + Math.round(amount * (ec.g - sc.g)),
+		b: sc.b + Math.round(amount * (ec.b - sc.b)),
+		a: sc.a + Math.round(amount * (ec.a - sc.a))
+	});
+}
+
+instance.prototype.toColor = function (color) {
+	return {
+		b: color & 0xFF,
+		g: (color & 0xFF00) >>> 8,
+		r: (color & 0xFF0000) >>> 16,
+		a: ((color & 0xFF000000) >>> 24) / 255
+	};
+}
+instance.prototype.fromColor = function (color) {
+	return (((color.r & 0xff) << 16) |
+		((color.g & 0xff) << 8) |
+		(color.b & 0xff))
+		+ color.a * 0x1000000
+}
 
 instance_skel.extendedBy(instance);
 exports = module.exports = instance;
