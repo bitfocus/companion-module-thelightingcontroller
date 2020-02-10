@@ -39,3 +39,11 @@ Button colors can also be synchronized with controller button colors using the f
 - Refresh
     - Manual refresh interface state
 - Custom Command (Advanced users only - allows sending a custom TCP command for future-proofing)
+
+### Feedback
+
+- **Offline** : Indicates when the Controller software is disconnected, by dimming buttons and setting text to 'Offline'.
+- **Synchronise button colors, by index** : Will synchronise the button colours using the specified button's index.  Also indicates Offline status. (Also indicated when offline)
+- **Synchronise button colors, by position** : Will synchronise the button colours using the specified button's position. (Also indicated when offline)
+- **Match fader value** : Will set the button color when the specified fader's value matches a specific value to within the specified tolerance.
+- **Fade with fader value** : Will fade the background color of the button based on the fader's value.

@@ -5,7 +5,7 @@ const ENCODING = "utf8";
 const NAMEPREFIX = '$';
 
 // Defines button types, including icons
-const IMAGEHEAD='iVBORw0KGgoAAAANSUhEUgAAA';
+const IMAGEHEAD = 'iVBORw0KGgoAAAANSUhEUgAAA';
 const buttonTypes = [{
 	id: 0,
 	name: 'Steps',
@@ -49,15 +49,8 @@ var log;
 function instance(system, id, config) {
 	var self = this;
 
-	self.CHOICES_INPUTS = [];
-	self.CHOICES_OUTPUTS = [];
-	self.CHOICES_PRESETS = [];
-
-	self.state = {};
-
 	// super-constructor
 	instance_skel.apply(this, arguments);
-
 	return self;
 }
 
@@ -66,6 +59,9 @@ instance.prototype.init = function () {
 
 	debug = self.debug;
 	log = self.log;
+
+	// Blank state
+	self.updateState();
 
 	self.status(self.STATE_UNKNOWN);
 	self.init_tcp();
@@ -126,6 +122,10 @@ instance.prototype.destroy = function () {
 
 instance.prototype.action = function (action) {
 	var self = this;
+	if (self.state.offline) {
+		return;
+	}
+
 	var cmd;
 	var opt = action.options;
 
@@ -281,10 +281,14 @@ instance.prototype.feedback = function (feedback, bank) {
 		case 'buttonColor':
 		case 'buttonColorPosition':
 			var button = self.getButton(opt.name);
-			if (!button) {
+			if (!button || self.state.offline) {
 				return {
-					color: opt.disabledfg,
-					bgcolor: opt.disabledbg
+					style: 'text',
+					text: 'Offline',
+					alignment: 'center:center',
+					size: '18',
+					color: opt.offlinefg,
+					bgcolor: opt.offlinebg
 				};
 			} else if (button.pressed) {
 				var bg;
@@ -312,10 +316,14 @@ instance.prototype.feedback = function (feedback, bank) {
 		case 'faderColor':
 		case 'faderFadeColor':
 			var fader = self.getFader(opt.name);
-			if (!fader) {
+			if (!fader || self.state.offline) {
 				return {
-					color: opt.disabledfg,
-					bgcolor: opt.disabledbg
+					style: 'text',
+					text: 'Offline',
+					alignment: 'center:center',
+					size: '18',
+					color: opt.offlinefg,
+					bgcolor: opt.offlinebg
 				};
 			} else if (feedback.type == 'faderColor') {
 				var delta = Math.abs(fader.value - opt.value);
@@ -373,6 +381,22 @@ instance.prototype.feedback = function (feedback, bank) {
 			}
 			break;
 
+		/*
+		 * Miscellaneous
+		 */
+		case 'offline':
+			if (self.state.offline) {
+				return {
+					style: 'text',
+					text: 'Offline',
+					alignment: 'center:center',
+					size: '18',
+					color: opt.offlinefg,
+					bgcolor: opt.offlinebg
+				};
+			}
+			break;
+
 		default:
 			log('error', `Unknown feedback type - ${feedback.type}`);
 			break;
@@ -402,10 +426,13 @@ instance.prototype.init_tcp = function () {
 
 		self.socket.on('status_change', function (status, message) {
 			self.status(status, message);
+			if (status >= self.STATUS_ERROR) {
+				self.updateState();
+			}
 		});
 
 		self.socket.on('connect', function () {
-			self.status(this.STATUS_UNKNOWN, 'Connected, waiting for server ready');
+			self.status(self.STATUS_UNKNOWN, 'Connected, waiting for server ready');
 			// TODO Set encoding to be safe! self.socket.setEncoding(ENCODING);
 			self.send(`HELLO${SEPARATOR}${APPNAME}${SEPARATOR}${self.config.password}`);
 		});
@@ -524,738 +551,794 @@ instance.prototype.parseName = function (name) {
 instance.prototype.updateState = function (rawButtonList) {
 	var self = this;
 	const state = {
+		offline: true,
 		pages: {},
 		faders: {},
 		buttons: {}
 	};
-
 	const variables = [];
+	const presets = [];
+	var feedback = {};
+	var actions = {};
 
-	if (rawButtonList.buttons && rawButtonList.buttons.page) {
-		var index = 0;
-		rawButtonList.buttons.page.forEach((page) => {
-			if (!page.$) { return; }
-			const p = {
-				index: ++index,
-				name: page.$.name,
-				columns: page.$.columns,
-				columnButtons: {},
-				buttons: {}
-			}
-			variables.push({ label: `Page ${p.index} name`, name: `page${p.index}Name` });
-			variables.push({ label: `Page ${p.index} column count`, name: `page${p.index}Columns` });
-			variables.push({ label: `Page ${p.index} button count`, name: `page${p.index}Buttons` });
-
-			var col = 1;
-			while (col <= p.columns) {
-				if (page.$['colbuttons_' + col]) {
-					p.columnButtons[col] = page.$['colbuttons_' + col];
+	if (rawButtonList) {
+		state.offline = false;
+		if (rawButtonList.buttons && rawButtonList.buttons.page) {
+			var index = 0;
+			rawButtonList.buttons.page.forEach((page) => {
+				if (!page.$) { return; }
+				const p = {
+					index: ++index,
+					name: page.$.name,
+					columns: page.$.columns,
+					columnButtons: {},
+					buttons: {}
 				}
-				col++;
-			}
-			if (page.button && page.button.length) {
-				page.button.forEach((button) => {
-					if (!button.$) { return; }
-					var name = button['_'] || '';
-					var safeName = self.parseName(name);
-					var b = {
-						index: Number(button.$.index),
-						name: name,
-						safeName: safeName,
-						pressed: Boolean(Number(button.$.pressed)),
-						flash: Boolean(Number(button.$.flash)),
-						column: Number(button.$.column),
-						line: Number(button.$.line),
-						color: self.modifyBgColor(parseInt(button.$.color.substr(1), 16)),
-						typeId: Number(button.$.type),
-						page: p.index,
-						pageName: p.name
-					};
+				variables.push({ label: `Page ${p.index} name`, name: `page${p.index}Name` });
+				variables.push({ label: `Page ${p.index} column count`, name: `page${p.index}Columns` });
+				variables.push({ label: `Page ${p.index} button count`, name: `page${p.index}Buttons` });
 
-					b.position = `[${b.page}:${b.column},${b.line}]`;
-					var type = buttonTypes[b.typeId];
-					b.type = type || { id: b.typeId };
+				var col = 1;
+				while (col <= p.columns) {
+					if (page.$['colbuttons_' + col]) {
+						p.columnButtons[col] = page.$['colbuttons_' + col];
+					}
+					col++;
+				}
+				if (page.button && page.button.length) {
+					page.button.forEach((button) => {
+						if (!button.$) { return; }
+						var name = button['_'] || '';
+						var safeName = self.parseName(name);
+						var b = {
+							index: Number(button.$.index),
+							name: name,
+							safeName: safeName,
+							pressed: Boolean(Number(button.$.pressed)),
+							flash: Boolean(Number(button.$.flash)),
+							column: Number(button.$.column),
+							line: Number(button.$.line),
+							color: self.modifyBgColor(parseInt(button.$.color.substr(1), 16)),
+							typeId: Number(button.$.type),
+							page: p.index,
+							pageName: p.name
+						};
 
-					// Add direct lookups by index and position
-					p.buttons[b.name] = b;
-					state.buttons[b.index] = b;
-					state.buttons[b.position] = b;
+						b.position = `[${b.page}:${b.column},${b.line}]`;
+						var type = buttonTypes[b.typeId];
+						b.type = type || { id: b.typeId };
 
-					// We prepend name with $ to prevent collision with index/position
-					// which always start with a number, or '(' respectively
-					state.buttons[NAMEPREFIX + b.name] = b;
+						// Add direct lookups by index and position
+						p.buttons[b.name] = b;
+						state.buttons[b.index] = b;
+						state.buttons[b.position] = b;
 
-					// Create variables for index & position
-					variables.push({ label: `Button ${b.index} name`, name: `button${b.index}Name` });
-					variables.push({ label: `Button ${b.index} is pressed`, name: `button${b.index}Pressed` });
-					variables.push({ label: `Button ${b.index} is flash`, name: `button${b.index}Flash` });
-					variables.push({ label: `Button ${b.position} name`, name: `button${b.position}Name` });
-					variables.push({ label: `Button ${b.position} is pressed`, name: `button${b.position}Pressed` });
-					variables.push({ label: `Button ${b.position} is flash`, name: `button${b.position}Flash` });
+						// We prepend name with $ to prevent collision with index/position
+						// which always start with a number, or '(' respectively
+						state.buttons[NAMEPREFIX + b.name] = b;
 
-					// TODO add type, e.g. Macro, Steps, etc.
-				});
-			}
-			state.pages[p.name] = p;
+						// Create variables for index & position
+						variables.push({ label: `Button ${b.index} name`, name: `button${b.index}Name` });
+						variables.push({ label: `Button ${b.index} is pressed`, name: `button${b.index}Pressed` });
+						variables.push({ label: `Button ${b.index} is flash`, name: `button${b.index}Flash` });
+						variables.push({ label: `Button ${b.position} name`, name: `button${b.position}Name` });
+						variables.push({ label: `Button ${b.position} is pressed`, name: `button${b.position}Pressed` });
+						variables.push({ label: `Button ${b.position} is flash`, name: `button${b.position}Flash` });
+
+						// TODO add type, e.g. Macro, Steps, etc.
+					});
+				}
+				state.pages[p.name] = p;
+			});
+		}
+
+		if (rawButtonList.buttons && rawButtonList.buttons.fader) {
+			rawButtonList.buttons.fader.forEach((fader) => {
+				if (!fader.$) { return; }
+				var f = {
+					index: Number(fader.$.index),
+					name: fader['_'],
+					value: Number(fader.$.value)
+				};
+				state.faders[f.index] = f;
+
+				variables.push({ label: `Fader ${f.index} name`, name: `fader${f.index}Name` });
+				variables.push({ label: `Fader ${f.index} value`, name: `fader${f.index}Value` });
+			});
+		}
+
+		// Update variable defintions
+		self.setVariableDefinitions(variables);
+
+		// Set variables and create presets
+		Object.values(state.pages).forEach((page) => {
+			self.setVariable(`page${page.index}Name`, page.name);
+			self.setVariable(`page${page.index}Columns`, page.columns);
+			self.setVariable(`page${page.index}Buttons`, Object.keys(page.buttons).length);
 		});
-	}
 
-	if (rawButtonList.buttons && rawButtonList.buttons.fader) {
-		rawButtonList.buttons.fader.forEach((fader) => {
-			if (!fader.$) { return; }
-			var f = {
-				index: Number(fader.$.index),
-				name: fader['_'],
-				value: Number(fader.$.value)
-			};
-			state.faders[f.index] = f;
+		var faderChoices = [];
+		Object.values(state.faders).forEach((fader) => {
+			self.setVariable(`fader${fader.index}Name`, fader.name);
+			self.setVariable(`fader${fader.index}Value`, fader.value);
+			faderChoices.push({ id: fader.index, label: `${fader.index}: ${fader.name}` });
 
-			variables.push({ label: `Fader ${f.index} name`, name: `fader${f.index}Name` });
-			variables.push({ label: `Fader ${f.index} value`, name: `fader${f.index}Value` });
+			// Add fader presets
+			presets.push({
+				category: 'Faders',
+				label: 'Set Fader to 0 (ON), and fade background with fader value.',
+				bank: {
+					style: 'text',
+					text: `$(QuickDMX:fader${fader.index}Name)\\n$(QuickDMX:fader${fader.index}Value)`,
+					size: 'auto',
+					color: self.rgb(255, 255, 255),
+					bgcolor: self.rgb(0, 0, 0)
+				},
+				actions: [
+					{
+						action: 'fader',
+						options: {
+							name: fader.index,
+							value: 0
+						}
+					}
+				],
+				feedbacks: [
+					{
+						type: 'faderFadeColor',
+						options: {
+							name: fader.index
+						}
+					}
+				]
+			}, {
+				category: 'Faders',
+				label: 'Set Fader to -100 (OFF).',
+				bank: {
+					style: 'text',
+					text: `$(QuickDMX:fader${fader.index}Name)\\nOFF`,
+					size: 'auto',
+					color: self.rgb(255, 255, 255),
+					bgcolor: self.rgb(0, 0, 0)
+				},
+				actions: [
+					{
+						action: 'fader',
+						options: {
+							name: fader.index,
+							value: -100
+						}
+					}
+				],
+				feedbacks: [
+					{
+						type: 'faderColor',
+						options: {
+							name: fader.index,
+							value: -100,
+							// Must match -100 exactly to be fully off
+							tolerance: 0,
+							matchedbg: self.rgb(128, 0, 0)
+						}
+					}
+				]
+			});
 		});
+
+		var buttonChoices = [];
+		var buttonPositionChoices = [];
+		Object.keys(state.buttons).forEach((key) => {
+			// Only look at named version of button, to prevent triplication
+			if (key.charAt(0) != NAMEPREFIX) { return; }
+			var button = state.buttons[key];
+			var flash = button.flash;
+
+			self.setVariable(`button${button.index}Name`, button.safeName);
+			self.setVariable(`button${button.index}Pressed`, button.pressed);
+			self.setVariable(`button${button.index}Flash`, flash);
+			self.setVariable(`button${button.position}Name`, button.safeName);
+			self.setVariable(`button${button.position}Pressed`, button.pressed);
+			self.setVariable(`button${button.position}Flash`, flash);
+			/*
+			self.setVariable(`button${button.index}Column`, button.column);
+			self.setVariable(`button${button.index}Line`, button.line);
+			self.setVariable(`button${button.index}Color`, button.color);
+			*/
+			buttonChoices.push({ id: button.index, label: `${button.pageName} #${button.index}: ${button.safeName}` });
+			buttonPositionChoices.push({ id: button.position, label: `${button.pageName} ${button.position}: ${button.safeName}` });
+
+			// Add button presets
+			presets.push({
+				category: 'Buttons by index',
+				label: flash ? 'Press flash button' : 'Toggle button',
+				bank: {
+					style: 'png',
+					text: `$(QuickDMX:button${button.index}Name)`,
+					png64: flash ? button.type.imageFlash : button.type.image,
+					alignment: 'center:bottom',
+					pngalignment: 'left:top',
+					size: 'auto',
+					color: 0,
+					bgcolor: button.color
+				},
+				actions: [
+					{
+						action: flash ? 'press' : 'toggle',
+						options: {
+							name: button.index
+						}
+					}
+				],
+				feedbacks: [
+					{
+						type: 'buttonColor',
+						options: {
+							name: button.index
+						}
+					}
+				]
+			}, {
+				category: 'Buttons by position',
+				label: flash ? 'Press flash button' : 'Toggle button',
+				bank: {
+					style: 'png',
+					text: `$(QuickDMX:button${button.position}Name)`,
+					png64: flash ? button.type.imageFlash : button.type.image,
+					alignment: 'center:bottom',
+					pngalignment: 'left:top',
+					size: 'auto',
+					color: 0,
+					bgcolor: button.color
+				},
+				actions: [
+					{
+						action: (flash ? 'press' : 'toggle') + 'Position',
+						options: {
+							name: button.position
+						}
+					}
+				],
+				feedbacks: [
+					{
+						type: 'buttonColorPosition',
+						options: {
+							name: button.position
+						}
+					}
+				]
+			});
+		});
+
+		presets.push({
+			category: 'Miscellaneous',
+			label: 'Refresh',
+			bank: {
+				style: 'text',
+				text: 'Refresh\\nDMX',
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0)
+			},
+			actions: [
+				{
+					action: 'refresh'
+				}
+			],
+			feedbacks: [
+				{
+					type: 'offline'
+				}
+			]
+		}, {
+			category: 'Miscellaneous',
+			label: 'Tap',
+			bank: {
+				style: 'text',
+				text: 'Tap\\nBPM',
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0)
+			},
+			actions: [
+				{
+					action: 'bpmTap'
+				}
+			],
+			feedbacks: [
+				{
+					type: 'offline'
+				}
+			]
+		}, {
+			category: 'Miscellaneous',
+			label: 'Beat',
+			bank: {
+				style: 'text',
+				text: 'Beat',
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0)
+			},
+			actions: [
+				{
+					action: 'beat'
+				}
+			],
+			feedbacks: [
+				{
+					type: 'offline'
+				}
+			]
+		}, {
+			category: 'Miscellaneous',
+			label: 'Auto BPM',
+			bank: {
+				style: 'text',
+				text: 'Auto\\nBPM',
+				size: 'auto',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0),
+				latch: true
+			},
+			actions: [
+				{
+					action: 'autobpm',
+					options: {
+						state: 'true'
+					}
+				}
+			],
+			release_actions: [
+				{
+					action: 'autobpm',
+					options: {
+						state: 'false'
+					}
+				}
+			],
+			feedbacks: [
+				{
+					type: 'offline'
+				}
+			]
+		}, {
+			category: 'Miscellaneous',
+			label: 'Freeze',
+			bank: {
+				style: 'text',
+				text: 'Freeze',
+				size: '18',
+				color: self.rgb(255, 255, 255),
+				bgcolor: self.rgb(0, 0, 0),
+				latch: true
+			},
+			actions: [
+				{
+					action: 'freeze',
+					options: {
+						state: 'true'
+					}
+				}
+			],
+			release_actions: [
+				{
+					action: 'freeze',
+					options: {
+						state: 'false'
+					}
+				}
+			],
+			feedbacks: [
+				{
+					type: 'offline'
+				}
+			]
+		})
+
+		/*
+		 * Update actions
+		 */
+		actions = {
+			/*
+			 * Tempo controls
+			 */
+			'bpm': {
+				label: 'Set BPM',
+				options: [{
+					type: 'textinput',
+					label: 'BPM',
+					id: 'bpm',
+					default: '120',
+					regex: '/^\\d{1,3}$/'
+				}]
+			},
+			'bpmTap': {
+				label: 'Tap BPM'
+			},
+			'beat': {
+				label: 'Send a beat'
+			},
+			'autobpm': {
+				label: 'Set Auto BPM',
+				options: [{
+					type: 'dropdown',
+					label: 'On/Off',
+					id: 'state',
+					choices: [{ id: 'false', label: 'Off' }, { id: 'true', label: 'On' }]
+				}]
+			},
+			'freeze': {
+				label: 'Freeze',
+				options: [{
+					type: 'dropdown',
+					label: 'On/Off',
+					id: 'state',
+					choices: [{ id: 'false', label: 'Off' }, { id: 'true', label: 'On' }]
+				}]
+			},
+			/*
+			 * Cues
+			 */
+			'cue': {
+				label: 'Toggle Cue',
+				options: [{
+					type: 'textInput',
+					label: 'Button index',
+					id: 'name',
+					regex: self.REGEX_SOMETHING
+				}]
+			},
+			/*
+			 * Buttons
+			 */
+			'toggle': {
+				label: 'Toggle Button, by index',
+				options: [{
+					type: 'dropdown',
+					label: 'Button index',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonChoices
+				}]
+			},
+			'press': {
+				label: 'Press Button, by index',
+				options: [{
+					type: 'dropdown',
+					label: 'Button index',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonChoices
+				}]
+			},
+			'release': {
+				label: 'Release Button, by index',
+				options: [{
+					type: 'dropdown',
+					label: 'Button index',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonChoices
+				}]
+			},
+			'togglePosition': {
+				label: 'Toggle Button, by position',
+				options: [{
+					type: 'dropdown',
+					label: 'Button position',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonPositionChoices
+				}]
+			},
+			'pressPosition': {
+				label: 'Press Button, by position',
+				options: [{
+					type: 'dropdown',
+					label: 'Button position',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonPositionChoices
+				}]
+			},
+			'releasePosition': {
+				label: 'Release Button, by position',
+				options: [{
+					type: 'dropdown',
+					label: 'Name',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonPositionChoices
+				}]
+			},
+			/*
+			 * Faders
+			 */
+			'fader': {
+				label: 'Set fader value',
+				options: [{
+					type: 'dropdown',
+					label: 'Fader',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: faderChoices
+				},
+				{
+					type: 'textinput',
+					label: 'Value (-100 -> 100)',
+					id: 'value',
+					regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+				}]
+			},
+			/*
+			 * Sequential
+			 */
+			'sequentialGo': {
+				label: 'Sequential Go'
+			},
+			'sequentialPause': {
+				label: 'Sequential Pause'
+			},
+			'sequentialStop': {
+				label: 'Sequential Stop'
+			},
+			/*
+			 * Timeline
+			 */
+			'timelinePlayfrom': {
+				label: 'Timeline Play From'
+			},
+			'timelinePlay': {
+				label: 'Timeline Play'
+			},
+			'timelineStop': {
+				label: 'Timeline Stop'
+			},
+			/*
+			 * Custom commands
+			 */
+			'refresh': {
+				label: 'Refresh interface'
+			},
+			'sendcustomcommand': {
+				label: 'Send custom command',
+				options: [{
+					type: 'textinput',
+					label: 'Command',
+					id: 'command',
+					default: 'HELLO',
+					tooltip: "Enter any command you like in plain ASCII. Beware of correct syntax, you mustn't enter the linefeed at the end of the command.",
+					regex: self.REGEX_SOMETHING
+				}]
+			}
+		};
+
+		/*
+		 * Update feedbacks
+		 */
+		feedback = {
+			/*
+			 * Buttons
+			 */
+			buttonColor: {
+				label: 'Synchronise button colors, by index',
+				description: 'Will synchronise the button colours using the specified button\'s index.',
+				options: [{
+					type: 'dropdown',
+					label: 'Button index',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonChoices
+				},
+				{
+					type: 'textinput',
+					label: 'Pressed alpha',
+					id: 'alpha',
+					default: '128',
+					tooltip: 'A number from 0 to 255, where 0 will set the backgound of pressed buttons to black, and 255 will not affect the background.',
+					regex: '/^(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])$/'
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Foreground color',
+					id: 'offlinefg',
+					default: self.rgb(80, 80, 80)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Background color',
+					id: 'offlinebg',
+					default: self.rgb(0, 0, 0)
+				}]
+			},
+			buttonColorPosition: {
+				label: 'Synchronise button colors, by position',
+				description: 'Will synchronise the button colours using the specified button\'s position.',
+				options: [{
+					type: 'dropdown',
+					label: 'Name',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: buttonPositionChoices
+				},
+				{
+					type: 'textinput',
+					label: 'Pressed alpha',
+					id: 'alpha',
+					default: '128',
+					tooltip: 'A number from 0 to 255, where 0 will set the backgound of pressed buttons to black, and 255 will not affect the background.',
+					regex: '/^(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])$/'
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Foreground color',
+					id: 'offlinefg',
+					default: self.rgb(80, 80, 80)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Background color',
+					id: 'offlinebg',
+					default: self.rgb(0, 0, 0)
+				}]
+			},
+			/*
+			 * Faders
+			 */
+			faderColor: {
+				label: 'Match fader value',
+				description: 'Will set the button color when the specified fader\'s value matches a specific value.',
+				options: [{
+					type: 'dropdown',
+					label: 'Fader',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: faderChoices
+				},
+				{
+					type: 'textinput',
+					label: 'Value (-100 -> 100) to match',
+					id: 'value',
+					default: 0,
+					tooltip: 'Value of fader to match',
+					regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+				},
+				{
+					type: 'textinput',
+					label: 'Tolerance (0 -> 100)',
+					id: 'tolerance',
+					default: 10,
+					tooltip: 'Values within +/-tolerance of the specified value will be considered as matching.',
+					regex: '/^(100|[0-9]|[0-9][0-9])$/'
+				},
+				{
+					type: 'colorpicker',
+					label: 'Matched Foreground color',
+					id: 'matchedfg',
+					default: self.rgb(255, 255, 255)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Matched Background color',
+					id: 'matchedbg',
+					default: self.rgb(0, 128, 0)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Foreground color',
+					id: 'offlinefg',
+					default: self.rgb(80, 80, 80)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Background color',
+					id: 'offlinebg',
+					default: self.rgb(0, 0, 0)
+				}]
+			},
+			faderFadeColor: {
+				label: 'Fade with fader value',
+				description: 'Will adjust the button\'s colors as the specified fader\'s value changes.',
+				options: [{
+					type: 'dropdown',
+					label: 'Fader',
+					id: 'name',
+					regex: self.REGEX_SOMETHING,
+					choices: faderChoices
+				},
+				{
+					type: 'textinput',
+					label: 'Start value (-100 -> 100)',
+					id: 'startValue',
+					default: 0,
+					tooltip: 'Start value of fade range (values outside the range will be clamped).',
+					regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+				},
+				{
+					type: 'textinput',
+					label: 'End value (-100 -> 100)',
+					id: 'endValue',
+					default: -100,
+					tooltip: 'Start value of fade range (values outside the range will be clamped).',
+					regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+				},
+				{
+					type: 'colorpicker',
+					label: 'Start Foreground color',
+					id: 'startfg',
+					default: self.rgb(255, 255, 255)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Start Background color',
+					id: 'startbg',
+					default: self.rgb(0, 200, 0)
+				},
+				{
+					type: 'colorpicker',
+					label: 'End Foreground color',
+					id: 'endfg',
+					default: self.rgb(255, 255, 255)
+				},
+				{
+					type: 'colorpicker',
+					label: 'End Background color',
+					id: 'endbg',
+					default: self.rgb(0, 0, 0)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Foreground color',
+					id: 'offlinefg',
+					default: self.rgb(80, 80, 80)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Offline Background color',
+					id: 'offlinebg',
+					default: self.rgb(0, 0, 0)
+				}]
+			},
+			/*
+			 * Miscellaneous
+			 */
+			offline: {
+				label: 'Mark offline.',
+				description: 'Will set the button to offline when disconnected.',
+				options: [
+					{
+						type: 'colorpicker',
+						label: 'Offline Foreground color',
+						id: 'offlinefg',
+						default: self.rgb(80, 80, 80)
+					},
+					{
+						type: 'colorpicker',
+						label: 'Offline Background color',
+						id: 'offlinebg',
+						default: self.rgb(0, 0, 0)
+					}]
+			},
+		};
+	} else {
+		// Update variable defintions
+		self.setVariableDefinitions(variables);
 	}
 
 	// Update state
 	self.state = state;
 
-	// Update variable defintions
-	self.setVariableDefinitions(variables);
-
-	// Set variables and create presets
-	var presets = [];
-	Object.values(self.state.pages).forEach((page) => {
-		self.setVariable(`page${page.index}Name`, page.name);
-		self.setVariable(`page${page.index}Columns`, page.columns);
-		self.setVariable(`page${page.index}Buttons`, Object.keys(page.buttons).length);
-	});
-
-	var faderChoices = [];
-	Object.values(self.state.faders).forEach((fader) => {
-		self.setVariable(`fader${fader.index}Name`, fader.name);
-		self.setVariable(`fader${fader.index}Value`, fader.value);
-		faderChoices.push({ id: fader.index, label: `${fader.index}: ${fader.name}` });
-
-		// Add fader presets
-		presets.push({
-			category: 'Faders',
-			label: 'Set Fader to 0 (ON), and fade background with fader value.',
-			bank: {
-				style: 'text',
-				text: `$(QuickDMX:fader${fader.index}Name)\\n$(QuickDMX:fader${fader.index}Value)`,
-				size: 'auto',
-				color: self.rgb(255, 255, 255),
-				bgcolor: self.rgb(0, 0, 0)
-			},
-			actions: [
-				{
-					action: 'fader',
-					options: {
-						name: fader.index,
-						value: 0
-					}
-				}
-			],
-			feedbacks: [
-				{
-					type: 'faderFadeColor',
-					options: {
-						name: fader.index
-					}
-				}
-			]
-		}, {
-			category: 'Faders',
-			label: 'Set Fader to -100 (OFF).',
-			bank: {
-				style: 'text',
-				text: `$(QuickDMX:fader${fader.index}Name)\\nOFF`,
-				size: 'auto',
-				color: self.rgb(255, 255, 255),
-				bgcolor: self.rgb(0, 0, 0)
-			},
-			actions: [
-				{
-					action: 'fader',
-					options: {
-						name: fader.index,
-						value: -100
-					}
-				}
-			],
-			feedbacks: [
-				{
-					type: 'faderColor',
-					options: {
-						name: fader.index,
-						value: -100,
-						// Must match -100 exactly to be fully off
-						tolerance: 0,
-						matchedbg: self.rgb(128, 0, 0)
-					}
-				}
-			]
-		});
-	});
-
-	var buttonChoices = [];
-	var buttonPositionChoices = [];
-	Object.keys(self.state.buttons).forEach((key) => {
-		// Only look at named version of button, to prevent triplication
-		if (key.charAt(0) != NAMEPREFIX) { return; }
-		var button = self.state.buttons[key];
-		var flash = button.flash;
-
-		self.setVariable(`button${button.index}Name`, button.safeName);
-		self.setVariable(`button${button.index}Pressed`, button.pressed);
-		self.setVariable(`button${button.index}Flash`, flash);
-		self.setVariable(`button${button.position}Name`, button.safeName);
-		self.setVariable(`button${button.position}Pressed`, button.pressed);
-		self.setVariable(`button${button.position}Flash`, flash);
-		/*
-		self.setVariable(`button${button.index}Column`, button.column);
-		self.setVariable(`button${button.index}Line`, button.line);
-		self.setVariable(`button${button.index}Color`, button.color);
-		*/
-		buttonChoices.push({ id: button.index, label: `${button.pageName} #${button.index}: ${button.safeName}` });
-		buttonPositionChoices.push({ id: button.position, label: `${button.pageName} ${button.position}: ${button.safeName}` });
-
-		// Add button presets
-		presets.push({
-			category: 'Buttons by index',
-			label: flash ? 'Press flash button' : 'Toggle button',
-			bank: {
-				style: 'png',
-				text: `$(QuickDMX:button${button.index}Name)`,
-				png64: flash ? button.type.imageFlash : button.type.image,
-				alignment: 'center:bottom',
-				pngalignment: 'left:top',
-				size: 'auto',
-				color: 0,
-				bgcolor: button.color
-			},
-			actions: [
-				{
-					action: flash ? 'press' : 'toggle',
-					options: {
-						name: button.index
-					}
-				}
-			],
-			feedbacks: [
-				{
-					type: 'buttonColor',
-					options: {
-						name: button.index
-					}
-				}
-			]
-		}, {
-			category: 'Buttons by position',
-			label: flash ? 'Press flash button' : 'Toggle button',
-			bank: {
-				style: 'png',
-				text: `$(QuickDMX:button${button.position}Name)`,
-				png64: flash ? button.type.imageFlash : button.type.image,
-				alignment: 'center:bottom',
-				pngalignment: 'left:top',
-				size: 'auto',
-				color: 0,
-				bgcolor: button.color
-			},
-			actions: [
-				{
-					action: (flash ? 'press' : 'toggle')+'Position',
-					options: {
-						name: button.position
-					}
-				}
-			],
-			feedbacks: [
-				{
-					type: 'buttonColorPosition',
-					options: {
-						name: button.position
-					}
-				}
-			]
-		});
-	});
-
-	presets.push({
-		category: 'Miscellaneous',
-		label: 'Refresh',
-		bank: {
-			style: 'text',
-			text: 'Refresh\\nDMX',
-			size: 'auto',
-			color: self.rgb(255, 255, 255),
-			bgcolor: self.rgb(0, 0, 0)
-		},
-		actions: [
-			{
-				action: 'refresh'
-			}
-		]
-	}, {
-		category: 'Miscellaneous',
-		label: 'Tap',
-		bank: {
-			style: 'text',
-			text: 'Tap\\nBPM',
-			size: 'auto',
-			color: self.rgb(255, 255, 255),
-			bgcolor: self.rgb(0, 0, 0)
-		},
-		actions: [
-			{
-				action: 'bpmTap'
-			}
-		]
-	}, {
-		category: 'Miscellaneous',
-		label: 'Beat',
-		bank: {
-			style: 'text',
-			text: 'Beat',
-			size: 'auto',
-			color: self.rgb(255, 255, 255),
-			bgcolor: self.rgb(0, 0, 0)
-		},
-		actions: [
-			{
-				action: 'beat'
-			}
-		]
-	}, {
-		category: 'Miscellaneous',
-		label: 'Auto BPM',
-		bank: {
-			style: 'text',
-			text: 'Auto\\nBPM',
-			size: 'auto',
-			color: self.rgb(255, 255, 255),
-			bgcolor: self.rgb(0, 0, 0),
-			latch: true
-		},
-		actions: [
-			{
-				action: 'autobpm',
-				options: {
-					state: 'true'
-				}
-			}
-		],
-		release_actions: [
-			{
-				action: 'autobpm',
-				options: {
-					state: 'false'
-				}
-			}
-		]
-	}, {
-		category: 'Miscellaneous',
-		label: 'Freeze',
-		bank: {
-			style: 'text',
-			text: 'Freeze',
-			size: '18',
-			color: self.rgb(255, 255, 255),
-			bgcolor: self.rgb(0, 0, 0),
-			latch: true
-		},
-		actions: [
-			{
-				action: 'freeze',
-				options: {
-					state: 'true'
-				}
-			}
-		],
-		release_actions: [
-			{
-				action: 'freeze',
-				options: {
-					state: 'false'
-				}
-			}
-		]
-	})
-
-	/*
-	 * Update actions
-	 */
-	self.system.emit('instance_actions', self.id, {
-		/*
-		 * Tempo controls
-		 */
-		'bpm': {
-			label: 'Set BPM',
-			options: [{
-				type: 'textinput',
-				label: 'BPM',
-				id: 'bpm',
-				default: '120',
-				regex: '/^\\d{1,3}$/'
-			}]
-		},
-		'bpmTap': {
-			label: 'Tap BPM'
-		},
-		'beat': {
-			label: 'Send a beat'
-		},
-		'autobpm': {
-			label: 'Set Auto BPM',
-			options: [{
-				type: 'dropdown',
-				label: 'On/Off',
-				id: 'state',
-				choices: [{ id: 'false', label: 'Off' }, { id: 'true', label: 'On' }]
-			}]
-		},
-		'freeze': {
-			label: 'Freeze',
-			options: [{
-				type: 'dropdown',
-				label: 'On/Off',
-				id: 'state',
-				choices: [{ id: 'false', label: 'Off' }, { id: 'true', label: 'On' }]
-			}]
-		},
-		/*
-		 * Cues
-		 */
-		'cue': {
-			label: 'Toggle Cue',
-			options: [{
-				type: 'textInput',
-				label: 'Button index',
-				id: 'name',
-				regex: self.REGEX_SOMETHING
-			}]
-		},
-		/*
-		 * Buttons
-		 */
-		'toggle': {
-			label: 'Toggle Button, by index',
-			options: [{
-				type: 'dropdown',
-				label: 'Button index',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonChoices
-			}]
-		},
-		'press': {
-			label: 'Press Button, by index',
-			options: [{
-				type: 'dropdown',
-				label: 'Button index',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonChoices
-			}]
-		},
-		'release': {
-			label: 'Release Button, by index',
-			options: [{
-				type: 'dropdown',
-				label: 'Button index',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonChoices
-			}]
-		},
-		'togglePosition': {
-			label: 'Toggle Button, by position',
-			options: [{
-				type: 'dropdown',
-				label: 'Button position',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonPositionChoices
-			}]
-		},
-		'pressPosition': {
-			label: 'Press Button, by position',
-			options: [{
-				type: 'dropdown',
-				label: 'Button position',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonPositionChoices
-			}]
-		},
-		'releasePosition': {
-			label: 'Release Button, by position',
-			options: [{
-				type: 'dropdown',
-				label: 'Name',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonPositionChoices
-			}]
-		},
-		/*
-		 * Faders
-		 */
-		'fader': {
-			label: 'Set fader value',
-			options: [{
-				type: 'dropdown',
-				label: 'Fader',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: faderChoices
-			},
-			{
-				type: 'textinput',
-				label: 'Value (-100 -> 100)',
-				id: 'value',
-				regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
-			}]
-		},
-		/*
-		 * Sequential
-		 */
-		'sequentialGo': {
-			label: 'Sequential Go'
-		},
-		'sequentialPause': {
-			label: 'Sequential Pause'
-		},
-		'sequentialStop': {
-			label: 'Sequential Stop'
-		},
-		/*
-		 * Timeline
-		 */
-		'timelinePlayfrom': {
-			label: 'Timeline Play From'
-		},
-		'timelinePlay': {
-			label: 'Timeline Play'
-		},
-		'timelineStop': {
-			label: 'Timeline Stop'
-		},
-		/*
-		 * Custom commands
-		 */
-		'refresh': {
-			label: 'Refresh interface'
-		},
-		'sendcustomcommand': {
-			label: 'Send custom command',
-			options: [{
-				type: 'textinput',
-				label: 'Command',
-				id: 'command',
-				default: 'HELLO',
-				tooltip: "Enter any command you like in plain ASCII. Beware of correct syntax, you mustn't enter the linefeed at the end of the command.",
-				regex: self.REGEX_SOMETHING
-			}]
-		}
-	});
-
-	/*
-	 * Update feedbacks
-	 */
-	self.setFeedbackDefinitions({
-		/*
-		 * Buttons
-		 */
-		buttonColor: {
-			label: 'Synchronise button colors, by index',
-			description: 'Will synchronise the button colours using the specified button\'s index.',
-			options: [{
-				type: 'dropdown',
-				label: 'Button index',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonChoices
-			},
-			{
-				type: 'textinput',
-				label: 'Pressed alpha',
-				id: 'alpha',
-				default: '128',
-				tooltip: 'A number from 0 to 255, where 0 will set the backgound of pressed buttons to black, and 255 will not affect the background.',
-				regex: '/^(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])$/'
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Foreground color',
-				id: 'disabledfg',
-				default: self.rgb(80, 80, 80)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Background color',
-				id: 'disabledbg',
-				default: self.rgb(0, 0, 0)
-			}]
-		},
-		buttonColorPosition: {
-			label: 'Synchronise button colors, by position',
-			description: 'Will synchronise the button colours using the specified button\'s position.',
-			options: [{
-				type: 'dropdown',
-				label: 'Name',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: buttonPositionChoices
-			},
-			{
-				type: 'textinput',
-				label: 'Pressed alpha',
-				id: 'alpha',
-				default: '128',
-				tooltip: 'A number from 0 to 255, where 0 will set the backgound of pressed buttons to black, and 255 will not affect the background.',
-				regex: '/^(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])$/'
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Foreground color',
-				id: 'disabledfg',
-				default: self.rgb(80, 80, 80)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Background color',
-				id: 'disabledbg',
-				default: self.rgb(0, 0, 0)
-			}]
-		},
-		/*
-		 * Faders
-		 */
-		faderColor: {
-			label: 'Match fader value',
-			description: 'Will set the button color when the specified fader\'s value matches a specific value.',
-			options: [{
-				type: 'dropdown',
-				label: 'Fader',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: faderChoices
-			},
-			{
-				type: 'textinput',
-				label: 'Value (-100 -> 100) to match',
-				id: 'value',
-				default: 0,
-				tooltip: 'Value of fader to match',
-				regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
-			},
-			{
-				type: 'textinput',
-				label: 'Tolerance (0 -> 100)',
-				id: 'tolerance',
-				default: 10,
-				tooltip: 'Values within +/-tolerance of the specified value will be considered as matching.',
-				regex: '/^(100|[0-9]|[0-9][0-9])$/'
-			},
-			{
-				type: 'colorpicker',
-				label: 'Matched Foreground color',
-				id: 'matchedfg',
-				default: self.rgb(255, 255, 255)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Matched Background color',
-				id: 'matchedbg',
-				default: self.rgb(0, 128, 0)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Foreground color',
-				id: 'disabledfg',
-				default: self.rgb(80, 80, 80)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Background color',
-				id: 'disabledbg',
-				default: self.rgb(0, 0, 0)
-			}]
-		},
-		faderFadeColor: {
-			label: 'Fade with fader value',
-			description: 'Will adjust the button\'s colors as the specified fader\'s value changes.',
-			options: [{
-				type: 'dropdown',
-				label: 'Fader',
-				id: 'name',
-				regex: self.REGEX_SOMETHING,
-				choices: faderChoices
-			},
-			{
-				type: 'textinput',
-				label: 'Start value (-100 -> 100)',
-				id: 'startValue',
-				default: 0,
-				tooltip: 'Start value of fade range (values outside the range will be clamped).',
-				regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
-			},
-			{
-				type: 'textinput',
-				label: 'End value (-100 -> 100)',
-				id: 'endValue',
-				default: -100,
-				tooltip: 'Start value of fade range (values outside the range will be clamped).',
-				regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
-			},
-			{
-				type: 'colorpicker',
-				label: 'Start Foreground color',
-				id: 'startfg',
-				default: self.rgb(255, 255, 255)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Start Background color',
-				id: 'startbg',
-				default: self.rgb(0, 200, 0)
-			},
-			{
-				type: 'colorpicker',
-				label: 'End Foreground color',
-				id: 'endfg',
-				default: self.rgb(255, 255, 255)
-			},
-			{
-				type: 'colorpicker',
-				label: 'End Background color',
-				id: 'endbg',
-				default: self.rgb(0, 0, 0)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Foreground color',
-				id: 'disabledfg',
-				default: self.rgb(80, 80, 80)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Disabled Background color',
-				id: 'disabledbg',
-				default: self.rgb(0, 0, 0)
-			}]
-		}
-	});
-
-	// Update presets
+	// Update actions, feedback and presets
+	self.system.emit('instance_actions', self.id, actions);
+	self.setFeedbackDefinitions(feedback);
 	self.setPresetDefinitions(presets);
 
-	// Check feedbacks
+	// Check all feedbacks
 	self.checkFeedbacks('buttonColor');
 	self.checkFeedbacks('buttonColorPosition');
 	self.checkFeedbacks('faderColor');
 	self.checkFeedbacks('faderFadeColor');
+	self.checkFeedbacks('offline');
 };
 
 instance.prototype.getButton = function (name) {
