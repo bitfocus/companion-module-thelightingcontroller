@@ -3,6 +3,8 @@ const SEPARATOR = '|';
 const APPNAME = "thelightingcontrollerclient";
 const ENCODING = "utf8";
 const NAMEPREFIX = '$';
+const TEXTTAG = '$(text)';
+const TEXTTAGRegex = new RegExp(TEXTTAG.replace(/[-[\]{}()*+?.,\\/^$|#\s]/g, '\\$&'), 'gi')
 
 // Defines button types, including icons
 const IMAGEHEAD = 'iVBORw0KGgoAAAANSUhEUgAAA';
@@ -272,7 +274,7 @@ instance.prototype.action = function (action) {
 
 instance.prototype.feedback = function (feedback, bank) {
 	var self = this;
-	var opt = feedback.options;
+	var opt = feedback.options || {};
 
 	switch (feedback.type) {
 		/*
@@ -281,14 +283,16 @@ instance.prototype.feedback = function (feedback, bank) {
 		case 'buttonColor':
 		case 'buttonColorPosition':
 			var button = self.getButton(opt.name);
-			if (!button || self.state.offline) {
+			if (self.state.offline) {
+				return;
+			} else if (!button) {
 				return {
 					style: 'text',
-					text: 'Offline',
+					text: opt.disabledText ? opt.disabledText.replace(TEXTTAGRegex, bank.text) : 'Disabled',
 					alignment: 'center:center',
 					size: '18',
-					color: opt.offlinefg,
-					bgcolor: opt.offlinebg
+					color: opt.disabledfg,
+					bgcolor: opt.disabledbg
 				};
 			} else if (button.pressed) {
 				var bg;
@@ -316,14 +320,16 @@ instance.prototype.feedback = function (feedback, bank) {
 		case 'faderColor':
 		case 'faderFadeColor':
 			var fader = self.getFader(opt.name);
-			if (!fader || self.state.offline) {
+			if (self.state.offline) {
+				return;
+			} else if (!fader) {
 				return {
 					style: 'text',
-					text: 'Offline',
+					text: opt.disabledText ? opt.disabledText.replace(TEXTTAGRegex, bank.text) : 'Disabled',
 					alignment: 'center:center',
 					size: '18',
-					color: opt.offlinefg,
-					bgcolor: opt.offlinebg
+					color: opt.disabledfg,
+					bgcolor: opt.disabledbg
 				};
 			} else if (feedback.type == 'faderColor') {
 				var delta = Math.abs(fader.value - opt.value);
@@ -384,11 +390,11 @@ instance.prototype.feedback = function (feedback, bank) {
 		/*
 		 * Miscellaneous
 		 */
-		case 'offline':
+		case 'status':
 			if (self.state.offline) {
 				return {
 					style: 'text',
-					text: 'Offline',
+					text: opt.offlineText ? opt.offlineText.replace(TEXTTAGRegex, bank.text) : 'Offline',
 					alignment: 'center:center',
 					size: '18',
 					color: opt.offlinefg,
@@ -689,6 +695,8 @@ instance.prototype.updateState = function (rawButtonList) {
 						options: {
 							name: fader.index
 						}
+					}, {
+						type: 'status'
 					}
 				]
 			}, {
@@ -720,6 +728,8 @@ instance.prototype.updateState = function (rawButtonList) {
 							tolerance: 0,
 							matchedbg: self.rgb(128, 0, 0)
 						}
+					}, {
+						type: 'status'
 					}
 				]
 			});
@@ -775,6 +785,8 @@ instance.prototype.updateState = function (rawButtonList) {
 						options: {
 							name: button.index
 						}
+					}, {
+						type: 'status'
 					}
 				]
 			}, {
@@ -804,6 +816,8 @@ instance.prototype.updateState = function (rawButtonList) {
 						options: {
 							name: button.position
 						}
+					}, {
+						type: 'status'
 					}
 				]
 			});
@@ -826,7 +840,7 @@ instance.prototype.updateState = function (rawButtonList) {
 			],
 			feedbacks: [
 				{
-					type: 'offline'
+					type: 'status'
 				}
 			]
 		}, {
@@ -846,7 +860,7 @@ instance.prototype.updateState = function (rawButtonList) {
 			],
 			feedbacks: [
 				{
-					type: 'offline'
+					type: 'status'
 				}
 			]
 		}, {
@@ -866,7 +880,7 @@ instance.prototype.updateState = function (rawButtonList) {
 			],
 			feedbacks: [
 				{
-					type: 'offline'
+					type: 'status'
 				}
 			]
 		}, {
@@ -898,7 +912,7 @@ instance.prototype.updateState = function (rawButtonList) {
 			],
 			feedbacks: [
 				{
-					type: 'offline'
+					type: 'status'
 				}
 			]
 		}, {
@@ -930,7 +944,7 @@ instance.prototype.updateState = function (rawButtonList) {
 			],
 			feedbacks: [
 				{
-					type: 'offline'
+					type: 'status'
 				}
 			]
 		})
@@ -1137,17 +1151,24 @@ instance.prototype.updateState = function (rawButtonList) {
 					default: '128',
 					tooltip: 'A number from 0 to 255, where 0 will set the backgound of pressed buttons to black, and 255 will not affect the background.',
 					regex: '/^(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])$/'
+				}, {
+					type: 'textinput',
+					label: 'Disabled Text',
+					id: 'disabledText',
+					tooltip: `Text to appear when button is not found, '${(TEXTTAG)}' is substituted with original text.`,
+					default: 'Disabled',
+					regex: self.REGEX_SOMETHING
 				},
 				{
 					type: 'colorpicker',
-					label: 'Offline Foreground color',
-					id: 'offlinefg',
+					label: 'Disabled Foreground color',
+					id: 'disabledfg',
 					default: self.rgb(80, 80, 80)
 				},
 				{
 					type: 'colorpicker',
-					label: 'Offline Background color',
-					id: 'offlinebg',
+					label: 'Disabled Background color',
+					id: 'disabledbg',
 					default: self.rgb(0, 0, 0)
 				}]
 			},
@@ -1168,17 +1189,24 @@ instance.prototype.updateState = function (rawButtonList) {
 					default: '128',
 					tooltip: 'A number from 0 to 255, where 0 will set the backgound of pressed buttons to black, and 255 will not affect the background.',
 					regex: '/^(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])$/'
+				}, {
+					type: 'textinput',
+					label: 'Disabled Text',
+					id: 'disabledText',
+					tooltip: `Text to appear when button is not found, '${(TEXTTAG)}' is substituted with original text.`,
+					default: 'Disabled',
+					regex: self.REGEX_SOMETHING
 				},
 				{
 					type: 'colorpicker',
-					label: 'Offline Foreground color',
-					id: 'offlinefg',
+					label: 'Disabled Foreground color',
+					id: 'disabledfg',
 					default: self.rgb(80, 80, 80)
 				},
 				{
 					type: 'colorpicker',
-					label: 'Offline Background color',
-					id: 'offlinebg',
+					label: 'Disabled Background color',
+					id: 'disabledbg',
 					default: self.rgb(0, 0, 0)
 				}]
 			},
@@ -1222,17 +1250,24 @@ instance.prototype.updateState = function (rawButtonList) {
 					label: 'Matched Background color',
 					id: 'matchedbg',
 					default: self.rgb(0, 128, 0)
+				}, {
+					type: 'textinput',
+					label: 'Disabled Text',
+					id: 'disabledText',
+					tooltip: `Text to appear when button is not found, '${(TEXTTAG)}' is substituted with original text.`,
+					default: 'Disabled',
+					regex: self.REGEX_SOMETHING
 				},
 				{
 					type: 'colorpicker',
-					label: 'Offline Foreground color',
-					id: 'offlinefg',
+					label: 'Disabled Foreground color',
+					id: 'disabledfg',
 					default: self.rgb(80, 80, 80)
 				},
 				{
 					type: 'colorpicker',
-					label: 'Offline Background color',
-					id: 'offlinebg',
+					label: 'Disabled Background color',
+					id: 'disabledbg',
 					default: self.rgb(0, 0, 0)
 				}]
 			},
@@ -1285,6 +1320,40 @@ instance.prototype.updateState = function (rawButtonList) {
 					label: 'End Background color',
 					id: 'endbg',
 					default: self.rgb(0, 0, 0)
+				}, {
+					type: 'textinput',
+					label: 'Disabled Text',
+					id: 'disabledText',
+					tooltip: `Text to appear when button is not found, '${(TEXTTAG)}' is substituted with original text.`,
+					default: 'Disabled',
+					regex: self.REGEX_SOMETHING
+				},
+				{
+					type: 'colorpicker',
+					label: 'Disabled Foreground color',
+					id: 'disabledfg',
+					default: self.rgb(80, 80, 80)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Disabled Background color',
+					id: 'disabledbg',
+					default: self.rgb(0, 0, 0)
+				}]
+			},
+			/*
+			 * Miscellaneous
+			 */
+			status: {
+				label: 'Update button based on status.',
+				description: 'Will set the button to offline when disconnected, or disabled when deleted.',
+				options: [{
+					type: 'textinput',
+					label: 'Offline Text',
+					id: 'offlineText',
+					tooltip: `Text to appear when button is offline, '${(TEXTTAG)}' is substituted with original text.`,
+					default: 'Offline',
+					regex: self.REGEX_SOMETHING
 				},
 				{
 					type: 'colorpicker',
@@ -1298,26 +1367,6 @@ instance.prototype.updateState = function (rawButtonList) {
 					id: 'offlinebg',
 					default: self.rgb(0, 0, 0)
 				}]
-			},
-			/*
-			 * Miscellaneous
-			 */
-			offline: {
-				label: 'Mark offline.',
-				description: 'Will set the button to offline when disconnected.',
-				options: [
-					{
-						type: 'colorpicker',
-						label: 'Offline Foreground color',
-						id: 'offlinefg',
-						default: self.rgb(80, 80, 80)
-					},
-					{
-						type: 'colorpicker',
-						label: 'Offline Background color',
-						id: 'offlinebg',
-						default: self.rgb(0, 0, 0)
-					}]
 			},
 		};
 	} else {
@@ -1338,7 +1387,7 @@ instance.prototype.updateState = function (rawButtonList) {
 	self.checkFeedbacks('buttonColorPosition');
 	self.checkFeedbacks('faderColor');
 	self.checkFeedbacks('faderFadeColor');
-	self.checkFeedbacks('offline');
+	self.checkFeedbacks('status');
 };
 
 instance.prototype.getButton = function (name) {
