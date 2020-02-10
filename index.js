@@ -641,7 +641,7 @@ instance.prototype.updateState = function (rawButtonList) {
 			label: 'Set Fader to 0 (ON), and fade background with fader value.',
 			bank: {
 				style: 'text',
-				text: `$(QuickDMX:fader${fader.index}Name)\\nON\\n$(QuickDMX:fader${fader.index}Value)`,
+				text: `$(QuickDMX:fader${fader.index}Name)\\n$(QuickDMX:fader${fader.index}Value)`,
 				size: 'auto',
 				color: self.rgb(255, 255, 255),
 				bgcolor: self.rgb(0, 0, 0)
@@ -665,10 +665,10 @@ instance.prototype.updateState = function (rawButtonList) {
 			]
 		}, {
 			category: 'Faders',
-			label: 'Set Fader to -100 (OFF), and highlight when with +/- 10 of value.',
+			label: 'Set Fader to -100 (OFF).',
 			bank: {
 				style: 'text',
-				text: `$(QuickDMX:fader${fader.index}Name)\\OFF\\n$(QuickDMX:fader${fader.index}Value)`,
+				text: `$(QuickDMX:fader${fader.index}Name)\\nOFF`,
 				size: 'auto',
 				color: self.rgb(255, 255, 255),
 				bgcolor: self.rgb(0, 0, 0)
@@ -688,6 +688,8 @@ instance.prototype.updateState = function (rawButtonList) {
 					options: {
 						name: fader.index,
 						value: -100,
+						// Must match -100 exactly to be fully off
+						tolerance: 0,
 						matchedbg: self.rgb(128, 0, 0)
 					}
 				}

@@ -9,3 +9,4 @@ Companion Module for integrating with [TheLightingController](http://thelighting
 - Periodically refresh interface as not all changes trigger the 'INTERFACE_CHANGE' message (e.g. buttons being moved). Add an optional refresh interval to config.
 - Add full BPM system and test.
 - Add convenience presets for BPM, Sequence, Timeline, etc.
+- Add timed fade option to 'fader' action which will allows for fade to new value over time.
