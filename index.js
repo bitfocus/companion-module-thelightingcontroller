@@ -141,7 +141,7 @@ instance.prototype.action = function (action) {
 		case 'bpmTap':
 			cmd = 'BPM_TAP';
 			break;
-		case 'bpm':
+		case 'bpm': {
 			const bpm = Number(opt.bpm);
 			if (isNaN(bpm) || bpm < 0 || bpm > 399) {
 				log('error', `Invalid BPM value ${opt.bpm}.`);
@@ -149,6 +149,7 @@ instance.prototype.action = function (action) {
 				cmd = `BPM${SEPARATOR}${bpm}`;
 			}
 			break;
+		}
 		case 'autobpm':
 			cmd = `AUTO_BPM_${(opt.state == 'true' ? 'ON' : 'OFF')}`;
 			break;
