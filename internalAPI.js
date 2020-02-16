@@ -188,7 +188,7 @@ class internalAPI {
 				var pressed = cmd == 'BUTTON_PRESS';
 				if (button) {
 					_this.log('info', `Button ${button.name} was ${(pressed ? 'pressed' : 'released')}`);
-					_this.setButton(button, pressed, true);
+					button.set(pressed, true);
 				} else {
 					_this.log('error', `Button ${parts[1]} is unknown.`);
 					_this.refresh();
@@ -200,7 +200,7 @@ class internalAPI {
 				var fader = _this.getFader(index);
 				if (fader) {
 					_this.log('debug', `Fader ${fader.name} was changed to ${value}.`);
-					_this.updateFader(fader, value, true);
+					fader.update(value, true);
 				} else {
 					_this.log('error', `Fader ${index} is unknown.`);
 					_this.refresh();
@@ -424,7 +424,7 @@ class internalAPI {
 							}
 
 							if (f.value != value) {
-								f.value = value;
+								f.update(value, true);
 								updated = changes.faders.values = true;
 							}
 
@@ -589,11 +589,6 @@ class internalAPI {
 
 					// TODO Can we only check some?
 					instance.checkAllFeedbacks();
-				} else {
-					// This shouldn't really happen, although we don't current read everything, any
-					// change to the XML should result in detectable changes due to the way properties
-					// are interlinked.
-					_this.log('warn', 'Parsed interface, but did not detect meaningful changes.');
 				}
 
 				// Ensure status set to OK.
@@ -710,80 +705,6 @@ class internalAPI {
 	}
 
 	/**
-	 * Sets the pressed state of the specified button.
-	 * 
-	 * @param {button} button - button to press.
-	 * @param {boolean} pressed - true if button is pressed; otherwise false.
-	 * @param {boolean} [skipSend] - if true then command is not sent to controller (used internally).
-	 * @access public
-	 * @since 1.1.0
-	 */
-	setButton(button, pressed, skipSend) {
-		let _this = this;
-		if (button === undefined) {
-			_this.log('error', 'Parameter fader is required.')
-			return;
-		}
-		let cmd = 'BUTTON_';
-		if (pressed === true) {
-			cmd += 'PRESS';
-		} else if (pressed === false) {
-			cmd += 'RELEASE';
-		} else {
-			_this.log('error', 'Parameter pressed must be a boolean.')
-			return;
-		}
-
-		if (!skipSend) {
-			_this.send(cmd, button.name);
-		}
-
-		if (button.pressed == pressed) {
-			return;
-		}
-
-		button.pressed = pressed;
-		_this.instance.updateButtonVariables(button, true);
-		_this.instance.checkAllFeedbacks('buttonColor', 'buttonColorPosition');
-	}
-
-	/**
-	 * Sends command to press the specified button.
-	 * 
-	 * @param {button} button - button to press.
-	 * @param {boolean} [skipSend] - if true then command is not sent to controller (used internally).
-	 * @access public
-	 * @since 1.1.0
-	 */
-	pressButton(button, skipSend) {
-		this.setButton(button, true, skipSend);
-	}
-
-	/**
-	 * Sends command to release the specified button.
-	 * 
-	 * @param {button} button - button to press.
-	 * @param {boolean} [skipSend] - if true then command is not sent to controller (used internally).
-	 * @access public
-	 * @since 1.1.0
-	 */
-	releaseButton(button, skipSend) {
-		this.setButton(button, false, skipSend);
-	}
-
-	/**
-	 * Sends command to toggle the specified button.
-	 * 
-	 * @param {button} button - button to toggle.
-	 * @param {boolean} [skipSend] - if true then command is not sent to controller (used internally).
-	 * @access public
-	 * @since 1.1.0
-	 */
-	toggleButton(button, skipSend) {
-		this.setButton(button, !button.pressed, skipSend);
-	}
-
-	/**
 	 * Gets the fader with the specified index.
 	 * 
 	 * @returns {fader} The fader.
@@ -793,39 +714,6 @@ class internalAPI {
 	 */
 	getFader(index) {
 		return this.faders[index];
-	}
-
-	/**
-	 * 
-	 * @param {fader} fader - the fader to update.
-	 * @param {number} value - the new value.
-	 * @param {boolean} [skipSend] - if true then command is not sent to controller (used internally).
-	 * @access public
-	 * @since 1.1.0
-	 */
-	updateFader(fader, value, skipSend) {
-		let _this = this;
-		if (fader === undefined) {
-			_this.log('error', 'Fader is required')
-			return;
-		}
-		if (value === undefined) {
-			_this.log('error', 'Value is required')
-			return;
-		}
-
-		if (!skipSend) {
-			_this.send('FADER_CHANGE', fader.id, value);
-		}
-
-		if (fader.value == value) {
-			return;
-		}
-
-		fader.value = value;
-		_this.instance.updateFaderVariables(fader, true);
-		_this.instance.checkFeedbacks('faderColor');
-		_this.instance.checkFeedbacks('faderFadeColor');
 	}
 
 	/**

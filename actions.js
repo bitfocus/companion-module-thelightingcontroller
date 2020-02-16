@@ -116,7 +116,15 @@ module.exports = {
 					type: 'textinput',
 					label: 'Value (-100 -> 100)',
 					id: 'value',
+					default: 0,
 					regex: '/^[+-]?(100|[0-9]|[0-9][0-9])$/'
+				},
+				{
+					type: 'textinput',
+					label: 'Time (100 -> 600000) milliseconds, or empty for no fade.',
+					id: 'time',
+					default: 2000,
+					regex: '/^(|[1-9]\\d{2,4}|[1-5]\\d{5}|600000)$/'
 				}]
 			},
 			/*
@@ -257,7 +265,7 @@ module.exports = {
 			case 'fader':
 				var fader = _this.api.getFader(opt.index);
 				if (fader) {
-					fader.update(opt.value);
+					fader.fade(opt.value, opt.time);
 				} else {
 					_this.log('error', `Cannot set fader position for unknown fader '${opt.index}'.`);
 				}

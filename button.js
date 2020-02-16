@@ -123,33 +123,69 @@ class button {
 	 * Sets the pressed state of the button.
 	 * 
 	 * @param {boolean} pressed - true if button is pressed; otherwise false.
+	 * @param {boolean} [skipSend] - if true then command is not sent to controller (used internally).
+	 * @access public
+	 * @since 1.1.0
 	*/
-    set(pressed) {
-        this.api.setButton(this, pressed);
+    set(pressed, skipSend) {
+		let _this = this;
+		if (button === undefined) {
+			_this.api.log('error', 'Parameter fader is required.')
+			return;
+		}
+		let cmd = 'BUTTON_';
+		if (pressed === true) {
+			cmd += 'PRESS';
+		} else if (pressed === false) {
+			cmd += 'RELEASE';
+		} else {
+			_this.api.log('error', 'Parameter pressed must be a boolean.')
+			return;
+		}
+
+		if (_this.pressed == pressed) {
+			return;
+		}
+
+		if (!skipSend) {
+			_this.api.send(cmd, _this.name);
+		}
+
+        let instance = _this.api.instance;
+		_this.pressed = pressed;
+		instance.updateButtonVariables(_this, true);
+		instance.checkAllFeedbacks('buttonColor', 'buttonColorPosition');
     }
 
 	/**
 	 * Sends command to press the button.
 	 * 
+     * @access public
+     * @since 1.1.0
 	*/
     press() {
-        this.api.pressButton(this);
+        this.set(true);
     }
 
 	/**
 	 * Sends command to release the specified button.
 	 * 
+     * @access public
+     * @since 1.1.0
 	 */
     release() {
-        this.api.releaseButton(this);
+        this.set(false);
     }
 
 	/**
 	 * Sends command to toggle the specified button.
 	 * 
+     * @access public
+     * @since 1.1.0
 	 */
     toggle() {
-        this.api.toggleButton(this);
+        let _this = this;
+        _this.set(!_this.pressed);
     }
 }
 

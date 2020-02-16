@@ -365,7 +365,7 @@ module.exports = {
 	 */
 	updateFaderVariables(fader, force) {
 		if (fader === undefined || fader.index === undefined) {
-			this.log('error', 'Required button is missing');
+			this.log('error', 'Required fader is missing');
 			return;
 		}
 		let _this = this;
