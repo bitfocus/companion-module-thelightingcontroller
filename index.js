@@ -40,7 +40,7 @@ class instance extends instance_skel {
 		this.api = new internalAPI(this);
 		this.icons = new icons(this);
 
-		this.REGEX_BPM = '/^([1-9][0-9]|[1-4][0-9][0-9]|500)$/';
+		this.REGEX_BPM = '/^([1-9]\\d|[1-4]\\d\\d|500)$/';
 
 		this.config = _config;
 	}

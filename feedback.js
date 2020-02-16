@@ -264,6 +264,12 @@ module.exports = {
 		_this.refreshFeedback();
 	},
 
+	/** Checks all defined feedbacks, or the feedbacks listed (if specified).
+	 * 
+	 * @access public
+	 * @param {...string} [args] - feedbacks to check
+	 * @since 1.1.0
+	 */
 	checkAllFeedbacks() {
 		let _this = this;
 		let al = arguments.length;
@@ -278,6 +284,9 @@ module.exports = {
 
 	/**
 	 * Updates the feedback definitions.
+	 * 
+	 * @access public
+	 * @since 1.1.0
 	 */
 	refreshFeedback() {
 		let _this = this;

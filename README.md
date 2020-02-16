@@ -9,7 +9,6 @@ Implements the [Communication Protocol](http://download.thelightingcontroller.co
 - Live Mobile can also be used directly from the web using https://live-mobile.thelightingcontroller.com/ to connect to the controller.
 
 ## TODOs
-- Periodically refresh interface as not all changes trigger the 'INTERFACE_CHANGE' message (e.g. buttons being moved, faders renamed). Add an optional refresh interval to config.
 - Add full BPM system and test.
 - Add timed fade option to 'fader' action which will allows for fade to new value over time.
 

@@ -51,6 +51,7 @@ class internalAPI {
 		let _this = this;
 		if (status >= _this.instance.STATUS_ERROR) {
 			_this.connected = false;
+			_this.updateRefreshInterval(0);
 		}
 
 		_this.instance.status(status, message);
@@ -79,11 +80,13 @@ class internalAPI {
 	 * @param {string} password - the host password.
 	 * @since 1.1.0
 	 */
-	connect(host, port, password) {
+	connect(host, port, password, refreshInterval) {
 		let _this = this;
 
 		let receivebuffer = '';
 		_this.disconnect();
+
+		_this.updateRefreshInterval(refreshInterval);
 
 		if (!host || !port) {
 			return;
@@ -132,6 +135,7 @@ class internalAPI {
 		let _this = this;
 		_this.connected = false;
 		_this.interfaceXML = undefined;
+		_this.updateRefreshInterval(0);
 
 		let socket = _this.socket;
 		delete _this.socket;
@@ -159,6 +163,7 @@ class internalAPI {
 
 				// Synchronise controller
 				_this.refresh(true);
+				_this.updateRefreshInterval();
 				break;
 			}
 			case 'BPM':
@@ -943,6 +948,37 @@ class internalAPI {
 			}
 		}
 		this.send('BUTTON_LIST');
+	}
+
+	/**
+	 * Updates the refresh interval.
+	 * 
+	 * @param {number|undefined} refreshInterval - Interval, in milliseconds, between interface refreshes. 0 to cancel, undefined to use current value.
+	 * @access public
+	 * @since 1.1.0
+	 */
+	updateRefreshInterval(refreshInterval) {
+		let _this = this;
+		if (isNaN(refreshInterval)) {
+			refreshInterval = _this.refreshInterval;
+		} else if (refreshInterval > 9999999) {
+			refreshInterval = 9999999;
+		}
+
+		// Cancel current refresh timer (if any).
+		let timer = _this.refreshTimer;
+		if (timer) {
+			delete _this.refreshTimer;
+			clearInterval(timer);
+		}
+
+		if (refreshInterval < 100) {
+			// Cancelling refresh
+			return;
+		}
+
+		_this.refreshInterval = refreshInterval;
+		_this.refreshTimer = setInterval(() => _this.refresh(false), refreshInterval);
 	}
 
 	/**

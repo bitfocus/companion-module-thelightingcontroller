@@ -39,10 +39,18 @@ module.exports = {
 			},
 			{
 				type: 'textinput',
+				id: 'refreshInterval',
+				label: 'How frequently, in milliseconds, we should poll for interface updates. Leave empty to not poll, otherwise >= 1000ms and < 10000000',
+				default: 10000,
+				width: 6,
+				regex: '/^(|[1-9]\\d{3,6})$/'
+			},
+			{
+				type: 'textinput',
 				id: 'bpm',
 				label: 'Initial BPM (note controller doesn\'t communicate it`s BPM so we have to set one)',
 				default: 120,
-				width: 4,
+				width: 6,
 				regex: this.REGEX_BPM
 			}
 		]
@@ -58,28 +66,31 @@ module.exports = {
 	updateConfig(config) {
 		let _this = this;
 		let resetConnection = true;
-		let updateBpm = false;
+		let updateBpm = true;
+		let updateInterval = true;
 
 		if (config !== undefined) {
-			resetConnection = _this.config === undefined ||
-				config.host != _this.config.host ||
-				config.port != _this.config.port ||
-				config.password != _this.config.password;
-			updateBpm = _this.config === undefined ||
-				config.bpm != _this.config.bpm
-
+			if (_this.config !== undefined) {
+				resetConnection = config.host != _this.config.host ||
+					config.port != _this.config.port ||
+					config.password != _this.config.password;
+				updateBpm = config.bpm != _this.config.bpm;
+				updateInterval = config.refreshInterval != _this.config.refreshInterval;
+			}
 			_this.config = config;
 		}
 
 		if (resetConnection || !_this.api.connected) {
-			_this.api.connect(_this.config.host, _this.config.port, _this.config.password);
-		} else {
-			// We're connected so refresh
-			_this.api.refresh();
-			
-			if (updateBpm) {
-				_this.api.setBPM(_this.config.bpm)
-			}
+			_this.api.connect(_this.config.host, _this.config.port, _this.config.password, _this.config.refreshInterval);
+			return;
+		}
+
+		if (updateInterval) {
+			_this.api.updateRefreshInterval(_this.config.refreshInterval);
+		}
+
+		if (updateBpm) {
+			_this.api.setBPM(_this.config.bpm)
 		}
 	}
 }
