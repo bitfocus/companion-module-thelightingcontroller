@@ -940,6 +940,4 @@ internalAPI.APPNAME = "thelightingcontrollerclient";
 internalAPI.ENCODING = "utf8";
 internalAPI.NAMEPREFIX = '$';
 
-internalAPI.VariableRegex = /^(?:page(?<page>\d{1,2})Columns|button(?:(?<button>\d+)|(?<buttonPosition>\[.*:\d+,\d+\])|(?<buttonName>-.*-))(?:Name|Pressed|Flash)|fader(?<fader>\d)(?:Name|Value))$/g;
-
 exports = module.exports = internalAPI;
