@@ -2,6 +2,7 @@ const tcp = require('../../tcp');
 const xmlStringParser = require('xml2js').parseString;
 const button = require('./button');
 const fader = require('./fader');
+const bpmCounter = require('./bpmCounter');
 
 /**
  * Companion instance API class for thelightingcontroller.
@@ -37,6 +38,8 @@ class internalAPI {
 		this.faderChoices = [];
 		this.buttonChoices = [];
 		this.buttonPositionChoices = [];
+
+		this.bpmCounter = new bpmCounter(this);
 	}
 
 	/**
@@ -52,7 +55,9 @@ class internalAPI {
 		if (status >= _this.instance.STATUS_ERROR) {
 			_this.connected = false;
 			_this.updateRefreshInterval(0);
+			_this.bpmCounter.setMode(false);
 		}
+		_this.instance.checkFeedbacks('status');
 
 		_this.instance.status(status, message);
 	}
@@ -136,10 +141,10 @@ class internalAPI {
 		_this.connected = false;
 		_this.interfaceXML = undefined;
 		_this.updateRefreshInterval(0);
-
+		_this.bpmCounter.setMode(false);
 		let socket = _this.socket;
-		delete _this.socket;
-		if (socket !== undefined) {
+		if (socket) {
+			delete _this.socket;
 			socket.destroy();
 		}
 	}
@@ -168,14 +173,15 @@ class internalAPI {
 			}
 			case 'BPM':
 				_this.log('info', `BPM requested.`);
-				_this.bpm(_this.instance.getVariableValue('BPM'));
+				_this.api.send('BPM', _this.bpmCounter.bpm);
 				break;
 			case 'BEAT_ON':
-				// TODO _this requires BEATS to be sent
-				_this.log('info', 'BPM ON');
+				_this.log('info', 'BPM mode set to Auto');
+				_this.bpmCounter.setMode(true);
 				break;
 			case 'BEAT_OFF':
-				_this.log('info', 'BPM OFF');
+				_this.log('info', 'BPM mode set to Manual');
+				_this.bpmCounter.setMode(false);
 				break;
 			case 'BUTTON_LIST': {
 				// Get remainder of line, without split
@@ -237,8 +243,8 @@ class internalAPI {
 		let _this = this;
 		let socket = _this.socket;
 		let cmd = [...arguments].join(internalAPI.SEPARATOR);
-		if (!socket || !socket.connected) {
-			_this.log('error', `Cannot send command '${cmd}' as offline!`);
+		if (!socket || !socket.connected || (arguments[0] != 'HELLO' && !_this.connected)) {
+			_this.log('debug', `Cannot send command '${cmd}' as offline!`);
 			return;
 		}
 
@@ -614,25 +620,20 @@ class internalAPI {
 	 * @since 1.1.0
 	 */
 	bpmTap() {
-		this.send('BPM_TAP');
+		let _this = this;
+		_this.bpmCounter.tap();
 	}
 
 	/**
 	 * Sets the current BPM
 	 * 
-	 * @param {number} bpm - beats per minute; between 10 and 500
+	 * @param {number} bpm - beats per minute; between 10 and 500, or 0 for manual mode.
 	 * @access public
 	 * @since 1.1.0
 	 */
 	bpm(bpm) {
 		let _this = this;
-		bpm = Number(bpm);
-		if (isNaN(bpm) || bpm < 10 || bpm > 500) {
-			_this.log('error', `Invalid BPM value ${bpm}.`);
-			return;
-		}
-		_this.instance.updateVariable('BPM', bpm, true);
-		_this.send('BPM', bpm)
+		_this.bpmCounter.updateBPM(Number(bpm));
 	}
 
 	/**
@@ -645,7 +646,9 @@ class internalAPI {
 	audioBPM(on) {
 		let _this = this;
 		let state = on ? 'ON' : 'OFF';
-		_this.instance.updateVariable('audioBPM', state, true);
+		_this.instance.updateVariable('audioBPM', state);		
+		_this.bpmCounter.setMode(!on);
+		_this.instance.refreshVariables();
 		_this.send('AUTO_BPM_' + state);
 	}
 
@@ -813,7 +816,7 @@ class internalAPI {
 		// The following are not reported from the controller directly and
 		// can be changed by other controllers so we force them to sync here.
 		// TODO Make this behaviour configurable.
-		_this.bpm(_this.instance.getVariableValue('BPM'));
+		_this.bpmCounter.updateBPM(_this.instance.getVariableValue('BPM'));
 		_this.audioBPM(_this.instance.getVariableValue('audioBPM') == 'ON');
 		_this.freeze(_this.instance.getVariableValue('frozen') == 'ON');
 		if (force) {

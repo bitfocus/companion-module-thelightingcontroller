@@ -22,9 +22,8 @@ The Faders also support lerping (fading) between 2 colors with the relative fade
 
 - Tempo control using:
     - Set BPM to explicit value
-    - Tap BPM, where BPM is set based on last 3 taps.
-    - Explicitly send Beat command.
-    - Turn on/off Audio BPM (where BPM calculated from PC audio)
+    - Tap BPM which not only set's the current BPM, but sends manual Beat commands to controller.
+    - Turn on/off Audio BPM (where BPM calculated from PC audio), when on use the Tap action to send individual Beat commands.
 - Set Freeze DMX to on/off.
 - Send a cue name, which will toggle the button of the same name.
 - Button commands, which can either be targetted by their name or position, and use one of the following modes:
@@ -52,3 +51,4 @@ The Faders also support lerping (fading) between 2 colors with the relative fade
 - **Match fader value** : Will set the button color when the specified fader's value matches a specific value to within the specified tolerance.
 - **Fade with fader value** : Will fade the background color of the button based on the fader's value.
 - **Timeline play/pause** : Changes the timeline play/pause to the correct icon.
+- **Sets the BPM Tap button state** : Updates the current beat icon on a button.

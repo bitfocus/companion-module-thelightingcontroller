@@ -73,14 +73,14 @@ module.exports = {
 		}, {
 			id: 'Tap',
 			category: 'Tempo',
-			label: 'Tap',
+			label: 'Tap BPM and send Beat.',
 			bank: {
 				style: 'text',
-				text: 'Tap',
+				text: '$(QuickDMX:BPM) BPM',
 				size: '14',
-				png64: icons.tap,
-				alignment: 'center:bottom',
-				pngalignment: 'center:center',
+				png64: icons.getBeatIcon(0),
+				alignment: 'center:top',
+				pngalignment: 'center:bottom',
 				color: _this.rgb(255, 255, 255),
 				bgcolor: _this.rgb(0, 0, 0)
 			},
@@ -91,24 +91,30 @@ module.exports = {
 			],
 			feedbacks: [
 				{
+					type: 'bpm'
+				},
+				{
 					type: 'status'
 				}
 			]
 		}, {
-			id: 'Beat',
+			id: 'Set BPM 120',
 			category: 'Tempo',
-			label: 'Beat',
+			label: 'Set BPM to 120.',
 			bank: {
 				style: 'text',
-				text: '$(QuickDMX:BPM)\\nBPM',
-				size: '14',
+				text: 'SET BPM\\n120',
+				size: 'auto',
 				alignment: 'center:center',
 				color: _this.rgb(255, 255, 255),
 				bgcolor: _this.rgb(0, 0, 0)
 			},
 			actions: [
 				{
-					action: 'beat'
+					action: 'bpm',
+					options: {
+						bpm: 120
+					}
 				}
 			],
 			feedbacks: [
@@ -119,7 +125,7 @@ module.exports = {
 		}, {
 			id: 'Audio BPM',
 			category: 'Tempo',
-			label: 'Audio BPM',
+			label: 'Set BPM to use audio (puts in manual Beat mode).',
 			bank: {
 				style: 'text',
 				text: '$(QuickDMX:audioBPM)',

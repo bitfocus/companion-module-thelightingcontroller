@@ -8,9 +8,8 @@ Implements the [Communication Protocol](http://download.thelightingcontroller.co
 - Inspiration gained from implementation of protocol at https://github.com/Tidwell/thelightingcontrollerclient.
 - Live Mobile can also be used directly from the web using https://live-mobile.thelightingcontroller.com/ to connect to the controller.
 
-## TODOs
-- Add full BPM system, to track BPM locally and submit BEAT messages as appropriate.
-
 ## KNOWN ISSUES
+- Presets are not shown until after initial connection, refresh required.
 - Presets do not set default options until the button is first viewed (Workaround added).
 - Variable name changes do not trigger button refreshes.
+- BPM is explicitly controller by companion, so Beats don't necessariily synchronise with those shown by QuickDMX.

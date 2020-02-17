@@ -32,9 +32,6 @@ module.exports = {
 			'bpmTap': {
 				label: 'Tap BPM'
 			},
-			'beat': {
-				label: 'Send a beat'
-			},
 			'audiobpm': {
 				label: 'Set BPM from system audio',
 				options: [{
@@ -207,9 +204,6 @@ module.exports = {
 			/*
 			 * Tempo controls
 			 */
-			case 'beat':
-				_this.api.beat();
-				break;
 			case 'bpmTap':
 				_this.api.bpmTap();
 				break;

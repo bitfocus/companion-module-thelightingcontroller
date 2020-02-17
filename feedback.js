@@ -13,6 +13,13 @@ module.exports = {
 
 		_this.feedbacks = {
 			/*
+			 * BPM
+			 */
+			bpm: {
+				label: 'Sets the BPM Tap button state.',
+				description: 'Sets the BPM Tap button state depending on the BPM mode and current beat.',
+			},
+			/*
 			 * Buttons
 			 */
 			buttonColor: {
@@ -314,6 +321,17 @@ module.exports = {
 
 		switch (type) {
 			/*
+			 *
+			 */
+			case 'bpm':
+				if (!_this.api.connected) {
+					return;
+				}
+				return {
+					png64: icons.getBeatIcon( _this.api.bpmCounter.beatNumber+1)
+				};
+			
+			/*
 			 * Buttons
 			 */
 			case 'buttonColor':
@@ -459,6 +477,7 @@ module.exports = {
 						text: opt.offlineText.replace(_this.TEXTTAGRegex, bank.text),
 						alignment: 'center:center',
 						size: '18',
+						png64: undefined,
 						color: opt.offlinefg == undefined ? _this.rgb(80, 80, 80) : opt.offlinefg,
 						bgcolor: opt.offlinebg == undefined ? _this.rgb(0, 0, 0) : opt.offlinebg
 					};

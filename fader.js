@@ -7,7 +7,7 @@
  * @author Craig Dean <thargy@yahoo.com>
  */
 class fader {
-    /**     * 
+    /**
 	 * Create an instance of a controller button.
      * 
      * @param {internalAPI} api 

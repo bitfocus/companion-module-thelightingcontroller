@@ -15,7 +15,9 @@ module.exports = {
 			}
 		};
 
+		this.updateVariableDefinitions('BPMMode', 'Whether in Auto (sends Beats) or Manual (tap beats) mode', 'Manual');
 		this.updateVariableDefinitions('BPM', 'Beats Per Minute', 120);
+		this.updateVariableDefinitions('Beat', 'Current beat number (1-4)', 0);
 		this.updateVariableDefinitions('audioBPM', 'Whether audio BPM is on', 'OFF');
 		this.updateVariableDefinitions('frozen', 'Whether DMX changes are frozen', 'OFF');
 		this.updateVariableDefinitions('lastCue', 'The last cue sent', '');
