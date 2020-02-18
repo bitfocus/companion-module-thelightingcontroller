@@ -40,6 +40,7 @@ class internalAPI {
 		this.buttonPositionChoices = [];
 
 		this.bpmCounter = new bpmCounter(this);
+		this.updateRefreshInterval(0);
 	}
 
 	/**
@@ -851,11 +852,12 @@ class internalAPI {
 	updateRefreshInterval(refreshInterval) {
 		let _this = this;
 		if (isNaN(refreshInterval)) {
-			refreshInterval = _this.refreshInterval;
+			refreshInterval = _this.refreshInterval || 0;
 		} else if (refreshInterval > 9999999) {
 			refreshInterval = 9999999;
 		}
 
+		console.log(`Refresh Interval: ${refreshInterval}`);
 		// Cancel current refresh timer (if any).
 		let timer = _this.refreshTimer;
 		if (timer) {
