@@ -118,7 +118,7 @@ class fader {
         let start = process.hrtime();
 
         // Kick off fade timer.
-        _this.fadeInterval = setInterval(() => {
+        _this.fadeInterval = setInterval(function () {
             _this.value = Math.round(next);
             next += step;
             let done = step > 0 ? next > value : next < value;

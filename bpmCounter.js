@@ -139,13 +139,17 @@ class bpmCounter {
 
         if (_this.auto) {
             let now = new Date();
-            let due = (_this.interval = bpmCounter.oneMinute / bpm) - (now - _this.lastBeat);
+            _this.interval = bpmCounter.oneMinute / bpm
+            let elapsed = (now - _this.lastBeat)
+            let due = _this.interval - elapsed;
+
             if (due < bpmCounter.accuracy) {
                 _this.beat();
             } else {
-                _this.beatTimer = setTimeout(() => _this.beat(), due);
+                _this.beatTimer = setTimeout(function () { _this.beat() }, due);
             }
         } else {
+            _this.interval = 0;
             _this.beat();
         }
     }
@@ -172,7 +176,7 @@ class bpmCounter {
         _this.api.instance.checkFeedbacks('bpm');
 
         if (_this.interval > 0) {
-            _this.beatTimer = setTimeout(() => _this.beat(), _this.interval);
+            _this.beatTimer = setTimeout(function () { _this.beat() }, _this.interval);
         }
     }
 }

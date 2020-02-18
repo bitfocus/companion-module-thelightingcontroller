@@ -646,7 +646,7 @@ class internalAPI {
 	audioBPM(on) {
 		let _this = this;
 		let state = on ? 'ON' : 'OFF';
-		_this.instance.updateVariable('audioBPM', state);		
+		_this.instance.updateVariable('audioBPM', state);
 		_this.bpmCounter.setMode(!on);
 		_this.instance.refreshVariables();
 		_this.send('AUTO_BPM_' + state);
@@ -869,7 +869,9 @@ class internalAPI {
 		}
 
 		_this.refreshInterval = refreshInterval;
-		_this.refreshTimer = setInterval(() => _this.refresh(false), refreshInterval);
+		_this.refreshTimer = setInterval(function () {
+			_this.refresh(false)
+		}, refreshInterval);
 	}
 
 	/**
