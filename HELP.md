@@ -7,6 +7,8 @@ Should work with all releases of [The Lighting Controller](http://thelightingcon
 
 And uses the same API as the [Live Mobile](https://thelightingcontroller.com/viewtopic.php?f=85&t=4552) application and web interface, as well as VirtualDJ.
 
+You can watch it in action [here](https://youtu.be/ZXqoXWrK5jI).
+
 ## Features
 The module exposes button and fader names and states/values.  These can be best understood by looking at the preset examples.
 
