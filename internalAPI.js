@@ -197,8 +197,7 @@ class internalAPI {
 					_this.log('info', `Button ${button.name} was ${(pressed ? 'pressed' : 'released')}`);
 					button.set(pressed, true);
 				} else {
-					_this.log('error', `Button ${parts[1]} is unknown.`);
-					_this.refresh();
+					_this.log('debug', `UNKNOWN Button ${parts[1]} was ${(pressed ? 'pressed' : 'released')}.`);
 				}
 				break;
 			case 'FADER_CHANGE':
@@ -209,8 +208,7 @@ class internalAPI {
 					_this.log('debug', `Fader ${fader.name} was changed to ${value}.`);
 					fader.update(value, true);
 				} else {
-					_this.log('error', `Fader ${index} is unknown.`);
-					_this.refresh();
+					_this.log('debug', `UNKNOWN Fader ${index} was changed to ${value}.`);
 				}
 				break;
 			case 'INTERFACE_CHANGE':
