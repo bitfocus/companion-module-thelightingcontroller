@@ -8,7 +8,7 @@ const bpmCounter = require('./bpmCounter');
  * Companion instance API class for thelightingcontroller.
  * Utilized to track the state of the controller.
  *
- * @version 1.1.0
+ * @version 1.1.2
  * @since 1.1.0
  * @author Craig Dean <thargy@yahoo.com>
  */
