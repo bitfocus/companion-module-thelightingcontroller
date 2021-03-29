@@ -1,6 +1,6 @@
 {
 	"name": "thelightingcontroller",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"api_version": "1.0.0",
 	"description": "The Lighting Controller (aka Showtec QuickDMX, Chauvet ShowXpress, Sweetlight Controller, Live Mobile)",
 	"keywords": [

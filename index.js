@@ -13,7 +13,7 @@ let variables = require('./variables');
  * Companion instance class for thelightingcontroller module.
  *
  * @extends instance_skel
- * @version 1.1.0
+ * @version 1.1.2
  * @since 1.1.0
  * @author Craig Dean <thargy@yahoo.com>
  */

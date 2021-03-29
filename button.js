@@ -2,7 +2,7 @@
  * Defines a controller button.
  * Utilized to generate/recall various icons.
  *
- * @version 1.1.0
+ * @version 1.1.2
  * @since 1.1.0
  * @author Craig Dean <thargy@yahoo.com>
  */
