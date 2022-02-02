@@ -16,12 +16,12 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/thargy/companion-module-thelightingcontroller.git"
+		"url": "git+https://github.com/bitfocus/companion-module-thelightingcontroller.git"
 	},
 	"author": "Craig Dean <thargy@yahoo.com>",
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/thargy/companion-module-thelightingcontroller/issues"
+		"url": "https://github.com/bitfocus/companion-module-thelightingcontroller/issues"
 	},
 	"dependencies": {
 		"xml2js": "^0.4.17"
