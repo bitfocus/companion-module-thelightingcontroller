@@ -26,7 +26,7 @@ class internalAPI {
 
 		this.debug = require('debug')(`instance:${instance.package_info.name}:${instance.id}.api`);
 		this.log = function (level, info) {
-			instance.system.emit('log', 'instance(' + instance.label + ')', level, "API: " + info);
+			instance.log(level, "API: " + info);
 		};
 
 		// We hold buttons by both name
