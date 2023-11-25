@@ -24,6 +24,6 @@
 		"url": "https://github.com/bitfocus/companion-module-thelightingcontroller/issues"
 	},
 	"dependencies": {
-		"xml2js": "^0.4.17"
+		"xml2js": "^0.5.0"
 	}
 }
